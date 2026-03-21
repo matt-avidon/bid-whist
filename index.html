@@ -940,6 +940,42 @@ body {
 .empty-title { font-size: 15px; font-weight: 500; color: var(--cream); margin-bottom: 6px; }
 .empty-sub { font-size: 13px; }
 
+/* ── Game recap toast ── */
+.game-toast {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 390;
+  background: var(--felt-light);
+  border-top: 1px solid var(--border-strong);
+  padding: 10px 16px 12px;
+  transform: translateY(100%);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex; flex-direction: column; gap: 4px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+.game-toast.show { transform: translateY(0); }
+.game-toast-top {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500;
+}
+.game-toast-icon { font-size: 16px; }
+.game-toast-result { color: var(--cream); flex: 1; }
+.game-toast-result .made { color: var(--teal-pale); }
+.game-toast-result .set { color: var(--red-bright); }
+.game-toast-flags { display: flex; gap: 4px; align-items: center; }
+.game-toast-money {
+  font-size: 11px; font-family: 'DM Mono', monospace;
+  color: var(--cream-dim); display: flex; gap: 12px; flex-wrap: wrap;
+}
+.game-toast-money .gtp { color: var(--teal-pale); }
+.game-toast-money .gtn { color: var(--red-bright); }
+@keyframes toastBar { from { width: 100%; } to { width: 0%; } }
+.game-toast-bar {
+  height: 2px; background: var(--border-strong); width: 100%;
+  border-radius: 1px; margin-top: 2px;
+}
+.game-toast-bar-fill {
+  height: 2px; background: var(--gold-dim); border-radius: 1px;
+  width: 100%; animation: toastBar 4s linear forwards;
+}
+
 /* ── Win popup ── */
 .win-popup {
   position: fixed; inset: 0; z-index: 400;
@@ -1242,8 +1278,9 @@ body { -webkit-text-size-adjust: 100%; }
 .insights-row.tappable { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .insights-row.tappable:active { background: rgba(201,168,76,0.06); border-radius: 4px; margin: 0 -4px; padding: 6px 4px; }
 .ins-info {
-  font-size: 9px; color: var(--gold-dim); margin-left: 4px;
-  font-family: 'DM Mono', monospace; opacity: 0.55; vertical-align: middle;
+  font-size: 11px; color: var(--gold); margin-left: 5px;
+  font-family: 'DM Mono', monospace; opacity: 0.85; vertical-align: middle;
+  display: inline-block;
 }
 </style>
 </head>
@@ -1426,7 +1463,8 @@ body { -webkit-text-size-adjust: 100%; }
     </div>
     <button class="btn-start" onclick="startSession()">▶ Start session</button>
     <div style="display:flex;gap:8px;margin-top:8px">
-      <button class="btn-danger" style="margin-top:0" onclick="exportData()">⬇ Export data</button>
+      <button class="btn-danger" style="margin-top:0" onclick="exportData()">⬇ Export JSON</button>
+      <button class="btn-danger" style="margin-top:0" onclick="exportCSV()">⬇ Export CSV</button>
       <button class="btn-danger" style="margin-top:0" onclick="importData()">⬆ Import data</button>
     </div>
     <button class="btn-danger" onclick="resetAll()">Reset all data</button>
@@ -1500,6 +1538,7 @@ function load() {
     if (d) {
       S = JSON.parse(d);
       if (S.session && !Array.isArray(S.session.games)) S.session.games = [];
+      if (S.session && !S.session.rotationBaseline) S.session.rotationBaseline = {};
       if (!Array.isArray(S.allSessions)) S.allSessions = [];
       if (!S.allTimeStats || typeof S.allTimeStats !== 'object') S.allTimeStats = {};
       if (!S.allTimeMoney || typeof S.allTimeMoney !== 'object') S.allTimeMoney = {};
@@ -1576,6 +1615,7 @@ function nav(tab) {
     if (_stickyObs) { _stickyObs.disconnect(); _stickyObs = null; }
     const ss = document.getElementById('sticky-score');
     if (ss) ss.classList.remove('show');
+    hideGameToast();
   }
   if (tab==='history') renderHistory();
   if (tab==='stats') renderStats();
@@ -1624,11 +1664,14 @@ function setBidder(p) {
 
 function setBid(b) {
   fBid = b;
+  // Default hands to exact minimum needed to make this bid (most likely outcome)
+  fHands = Math.min(13, b + 6);
   document.querySelectorAll('.bid-btn').forEach(el => {
     el.classList.remove('sel-a','sel-b');
     if (parseInt(el.dataset.bid) === b) el.classList.add(teamSelClass(fBidTeam || 'A'));
   });
   markStep('lbl-step2', true);
+  markStep('lbl-step3', true);  // auto-selected via bid+6 default
   renderHandsGrid();
   updatePreview();
 }
@@ -1927,6 +1970,9 @@ function logGame() {
         'Teams change — starting new rotation');
       s.rotationIdx++;
       game.rotationIncremented = true;
+      game.prevRotationBaseline = {...(s.rotationBaseline || {})};
+      // Snapshot money after payout as baseline for new rotation
+      s.rotationBaseline = {...s.money};
     } else {
       showWinPopup('♠', `${winTeam} win!`,
         `+$${winPay.toFixed(2)}${losingInBlitz?' (blitz)':''}`,
@@ -1946,6 +1992,8 @@ function logGame() {
       if (ri) { ri.classList.add('flash'); setTimeout(() => ri.classList.remove('flash'), 1200); }
     }
   }
+
+  showGameToast(game, delta, S.players);
 
   resetForm();
 
@@ -1997,7 +2045,11 @@ function undoLastGame() {
   if (S.allSessions.length && S.allSessions[S.allSessions.length-1].endedAt >= g.ts) {
     S.allSessions.pop();
     // Only undo the rotation increment if this specific game caused it
-    if (g.rotationIncremented && s.rotationIdx > 0) s.rotationIdx--;
+    if (g.rotationIncremented && s.rotationIdx > 0) {
+      s.rotationIdx--;
+      // Restore the rotation baseline that was in place before this game fired
+      s.rotationBaseline = g.prevRotationBaseline || {};
+    }
   }
 
   dismissWinPopup();
@@ -2086,20 +2138,24 @@ function renderPlay() {
   const target = cfg.target;
   const teamAPlayers = [rot[0], rot[1]];
   const teamBPlayers = [rot[2], rot[3]];
+  const baseline = s.rotationBaseline || {};
   function moneyPlayerHTML(p) {
-    const m = s.money[p]||0;
+    const totalM = s.money[p]||0;
+    const rotM = totalM - (baseline[p]||0);  // this rotation only
     const ps = s.pStats[p]||{};
     const bp = ps.bids ? `${Math.round(ps.bidsMade/ps.bids*100)}%` : '—';
-    const cls = m>0?'pos':m<0?'neg':'zero';
-    const pct = Math.max(0, Math.min(100, Math.abs(m) / Math.max(1, target) * 100));
-    const barCls = m >= 0 ? 'pos' : 'neg';
+    const rotCls = rotM>0?'pos':rotM<0?'neg':'zero';
+    const totalCls = totalM>0?'color:var(--teal-pale)':totalM<0?'color:var(--red-bright)':'color:var(--cream-dim)';
+    const pct = Math.max(0, Math.min(100, Math.abs(rotM) / Math.max(1, target) * 100));
+    const barCls = rotM >= 0 ? 'pos' : 'neg';
     return `<div class="money-player-card">
       <div class="money-name">${p}</div>
-      <div class="money-amt ${cls}">$${m.toFixed(2)}</div>
+      <div class="money-amt ${rotCls}">$${rotM.toFixed(2)}</div>
+      <div style="font-size:9px;font-family:'DM Mono',monospace;color:var(--cream-dim);margin-top:1px">This rotation</div>
       <div class="money-progress-wrap" style="margin:3px 0"><div class="money-progress-fill ${barCls}" style="width:${pct}%"></div></div>
       <div class="money-stats">
         <span class="money-stat">${ps.wins||0}W/${ps.losses||0}L</span>
-        <span class="money-stat">Bid ${bp}</span>
+        <span class="money-stat" style="${totalCls}">All-time $${totalM.toFixed(0)}</span>
       </div>
     </div>`;
   }
@@ -2177,9 +2233,20 @@ function renderHistory() {
   sessions.slice().reverse().forEach((sess, si) => {
     const label = sess.isCurrent ? 'Current session' : `Session ${all.length - si}`;
     const games = sess.games || [];
-    html += `<div class="history-session"><div class="history-session-hdr">${label} · ${games.length} games</div>
+    const sessionDate = games.length && games[0].ts ? new Date(games[0].ts).toLocaleDateString() : '';
+    html += `<div class="history-session"><div class="history-session-hdr">${label} · ${games.length} games${sessionDate ? ' · ' + sessionDate : ''}</div>
     <div class="card" style="padding:0;overflow:hidden">
-    <table class="games-table"><thead><tr><th>#</th><th>Bidder</th><th>Bid</th><th class="col-hands">Hands</th><th>Result</th><th>Flags</th><th>Score</th></tr></thead><tbody>`;
+    <table class="games-table">
+      <thead><tr>
+        <th style="color:var(--cream-dim);font-size:10px;font-weight:500">#</th>
+        <th style="color:var(--cream-dim);font-size:10px;font-weight:500">Time</th>
+        <th style="color:var(--cream-dim);font-size:10px;font-weight:500">Bidder</th>
+        <th style="color:var(--cream-dim);font-size:10px;font-weight:500">Bid</th>
+        <th class="col-hands" style="color:var(--cream-dim);font-size:10px;font-weight:500">Hands</th>
+        <th style="color:var(--cream-dim);font-size:10px;font-weight:500">Result</th>
+        <th style="color:var(--cream-dim);font-size:10px;font-weight:500">Flags</th>
+        <th style="color:var(--cream-dim);font-size:10px;font-weight:500">Score</th>
+      </tr></thead><tbody>`;
     games.slice().reverse().forEach(g => {
       const flags = [
         g.boston?'<span class="badge bos">Bos</span>':'',
@@ -2188,9 +2255,13 @@ function renderHistory() {
         g.kamikaze?'<span class="badge kam">Kam</span>':'',
         g.blitz?'<span class="badge blz">Blz</span>':''
       ].filter(Boolean).join('');
-      const res = g.madeIt ? `<span style="color:var(--green-bright)">Made</span>` : `<span style="color:var(--red-bright)">Set</span>`;
+      const res = g.kamikaze
+        ? (g.kamOutcome === 'made' ? `<span style="color:var(--teal)">KAM✓</span>` : `<span style="color:var(--red-bright)">KAM✗</span>`)
+        : (g.madeIt ? `<span style="color:var(--green-bright)">Made</span>` : `<span style="color:var(--red-bright)">Set</span>`);
+      const timeStr = g.ts ? new Date(g.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '—';
       html += `<tr>
         <td style="color:var(--gold-dim);font-family:'DM Mono',monospace">${g.n}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--cream-dim)">${timeStr}</td>
         <td class="em">${g.bidder}</td>
         <td style="font-family:'DM Mono',monospace">${g.bid}</td>
         <td class="col-hands" style="font-family:'DM Mono',monospace">${g.bidHands}–${g.otherHands}</td>
@@ -2206,8 +2277,8 @@ function renderHistory() {
 
 // ── Render Stats ───────────────────────────────────
 function renderStats() {
-  // All games across all sessions + current
-  const allGames = [...(S.allSessions||[]).flatMap(s => s.games||[]), ...(S.session?.games||[])];
+  // All games across all sessions + current (deduplicated — allSessions entries overlap)
+  const allGames = allGamesDeduped();
 
   // Date filter
   function filterByDate(games) {
@@ -2459,12 +2530,41 @@ function startSession() {
   if (invalids.length) return alert('Invalid config:\n• ' + invalids.join('\n• '));
   const cfg = raw;
   S.cfg = cfg;
-  S.session = { games:[], rotationIdx:0, scoreA:0, scoreB:0, money:{}, pStats:{}, cfg, startedAt:Date.now() };
+  S.session = { games:[], rotationIdx:0, scoreA:0, scoreB:0, money:{}, pStats:{}, cfg, startedAt:Date.now(), rotationBaseline:{} };
   S.players.forEach(p => { S.session.money[p]=0; S.session.pStats[p]={wins:0,losses:0,sets:0,bostons:0,cams:0,bids:0,bidsMade:0,kamA:0,kamM:0}; });
   resetForm();
   dismissWinPopup();
   save();
   nav('play');
+}
+
+function exportCSV() {
+  const games = allGamesDeduped();
+  if (!games.length) return alert('No games to export yet.');
+  const players = [...new Set(games.flatMap(g => [...(g.teamA||[]), ...(g.teamB||[])]))].sort();
+  const headers = ['Date','Time','Game#','RotIdx','TeamA_P1','TeamA_P2','TeamB_P1','TeamB_P2','Bidder','BidTeam','Bid','HandsBid','HandsOther','Result','Boston','Cambridge','Blitz','Kamikaze','KamOutcome','ScoreA','ScoreB',...players.map(p=>'Δ_'+p)];
+  const rows = games.map(g => {
+    const d = g.ts ? new Date(g.ts) : null;
+    return [
+      d ? d.toLocaleDateString() : '',
+      d ? d.toLocaleTimeString() : '',
+      g.n||'',
+      g.rotIdx??'',
+      (g.teamA||[])[0]||'', (g.teamA||[])[1]||'',
+      (g.teamB||[])[0]||'', (g.teamB||[])[1]||'',
+      g.bidder||'', g.bidTeam||'', g.bid||'',
+      g.bidHands??'', g.otherHands??'',
+      g.kamikaze ? (g.kamOutcome==='made'?'KAM-Made':'KAM-Lost') : g.madeIt ? 'Made' : 'Set',
+      g.boston?1:0, g.cambridge?1:0, g.blitz?1:0, g.kamikaze?1:0, g.kamOutcome||'',
+      g.scoreA??'', g.scoreB??'',
+      ...players.map(p => (g.delta?.[p]??0).toFixed(2))
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
+  });
+  const csv = [headers.join(','), ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'bid_whist_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
 }
 
 function resetAll() {
@@ -2510,6 +2610,7 @@ const METRIC_DEFS = {
   'extra-tricks': { title:'Avg Extra Tricks', formula:'avg(Books Won − (Bid + 6)) on made bids', desc:'How many surplus books above your contract you capture when you make it. Efficient bidders push their bids closer to their true hand strength.' },
   'hands-won': { title:'Avg Hands Won When Bidding', formula:'avg(Bidding team books) on made bids', desc:'The average number of books your team takes when you bid and make it. Ranges from Bid+6 up to 13. Combine with Avg Bid to see whether you\'re bidding your true strength.' },
   'fav-bid': { title:'Favorite Bid', formula:'Most frequently chosen bid value', desc:'The bid level you reach for most often. Reflects your natural comfort zone and risk appetite at the table.' },
+  'win-by-bid': { title:'Win Rate by Bid Level', formula:'(Bids Made ÷ Attempts) at each bid value (1–7)', desc:'Your sweet spots — the bid levels where you make it most reliably. High % at bid 4 means bid 4 is your comfort zone. Use this to find which levels to target and which to avoid.' },
   'set-by-bid': { title:'Set Rate by Bid Level', formula:'Sets ÷ Attempts at each bid value (1–7)', desc:'Breaks down your set rate per bid level. Useful for spotting which specific bid values consistently get you in trouble.' },
   'clutch': { title:'Clutch Score', formula:'Win% on bids placed while team score is negative', desc:'How well you perform when your back is against the wall. Bidding from a negative score (blitz) is high-pressure—this shows whether you rise to the occasion. Requires ≥3 qualifying bids.' },
   'kamikaze': { title:'Kamikaze', formula:'Made ÷ Attempted · Avg money impact per game', desc:'Kamikaze bids carry a 2× win/loss multiplier. Tracks your success rate and the average money gained or lost per kamikaze attempt.' },
@@ -2523,7 +2624,11 @@ const METRIC_DEFS = {
   'sets-taken': { title:'Total Sets Taken', formula:'Games where your bid failed (non-Kamikaze)', desc:'Total times your team was set while bidding. Each set costs the bidding team $2 (or $3 in blitz). Lower is better.' },
   'rounds': { title:'9-pt Rounds on Record', formula:'Count of completed rounds stored in the database', desc:'How many full rounds (first team to reach 9 pts) are in history. Each entry represents one complete round of play. A rough proxy for overall experience.' },
   'streak': { title:'Max Win Streak', formula:'Longest consecutive wins across all recorded games', desc:'Your personal best win streak. Counts wins on both bidding and defending teams.' },
-  'leaderboard': { title:'All-time Leaderboard', formula:'Ranked across Money, Win Rate, Bid Success, Bostons', desc:'Ranks all players across key metrics. Tap any column header to re-sort. The highlighted row is your own standing.' }
+  'leaderboard': { title:'All-time Leaderboard', formula:'Ranked across Money, Win Rate, Bid Success, Bostons', desc:'Ranks all players across key metrics. Tap any column header to re-sort. The highlighted row is your own standing.' },
+  'arch-gambler': { title:'Archetype: Gambler 🎲', formula:'Gambler Score ≥ 1.2 AND Set Rate > 35%', desc:'Gamblers bid high and aren\'t afraid to get set. They go for big hands and live with the consequences. High risk, high reward — great when the cards cooperate, costly when they don\'t.' },
+  'arch-robinhood': { title:'Archetype: Robinhood 🏹', formula:'Blitz bid win% ≥ 55% with ≥3 qualifying bids', desc:'Robinhoods play their best when they\'re behind. When their team is in blitz (negative points), they step up and make bids at a higher-than-average rate. The clutch player.' },
+  'arch-anchor': { title:'Archetype: Anchor ⚓', formula:'Defending win% ≥ 60% with ≥5 defending games', desc:'Anchors dominate when they\'re not the ones bidding. Their team wins the majority of hands as the defending side, holding opponents in check and earning points without ever needing to bid.' },
+  'arch-balanced': { title:'Archetype: Balanced ⚖️', formula:'No archetype threshold met yet', desc:'Balanced players haven\'t crossed the threshold for any single archetype—or are effective across all three dimensions. Either needs more data or is genuinely well-rounded at every aspect of the game.' }
 };
 
 function showMetricDef(key) {
@@ -2539,6 +2644,66 @@ function showMetricDef(key) {
 function hideMetricDef() {
   document.getElementById('def-backdrop').classList.remove('open');
   document.getElementById('def-sheet').classList.remove('open');
+}
+
+// ── Game recap toast ────────────────────────────────
+let _toastTimer = null;
+function showGameToast(game, delta, players) {
+  const madeIt = game.kamikaze ? game.kamOutcome === 'made' : game.madeIt;
+  const icon = madeIt ? '✓' : '✗';
+  const resultText = game.kamikaze
+    ? `${game.bidder} KAM ${madeIt ? 'made' : 'lost'}`
+    : `${game.bidder} bid ${game.bid} — ${madeIt ? '<span class="made">Made</span>' : '<span class="set">Set!</span>'}`;
+
+  const badges = [
+    game.boston ? '<span class="badge bos">Bos</span>' : '',
+    game.cambridge ? '<span class="badge cam">Cam</span>' : '',
+    game.blitz ? '<span class="badge blz">Blz</span>' : '',
+    game.kamikaze ? '<span class="badge kam">Kam</span>' : ''
+  ].filter(Boolean).join('');
+
+  // Money line — show each player's delta (skip zeros for compactness)
+  const moneyParts = players.map(p => {
+    const d = delta[p] || 0;
+    if (d === 0) return `<span>${p} $0</span>`;
+    return `<span class="${d > 0 ? 'gtp' : 'gtn'}">${p} ${d > 0 ? '+' : ''}$${d.toFixed(2)}</span>`;
+  });
+
+  document.getElementById('toast-icon').textContent = icon;
+  document.getElementById('toast-result').innerHTML = resultText;
+  document.getElementById('toast-flags').innerHTML = badges;
+  document.getElementById('toast-money').innerHTML = moneyParts.join('');
+
+  const bar = document.getElementById('toast-bar');
+  bar.style.animation = 'none';
+  bar.offsetHeight;
+  bar.style.animation = 'toastBar 4s linear forwards';
+
+  const toast = document.getElementById('game-toast');
+  toast.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => toast.classList.remove('show'), 4200);
+}
+function hideGameToast() {
+  clearTimeout(_toastTimer);
+  document.getElementById('game-toast').classList.remove('show');
+}
+
+// Deduplicate an array of game records by timestamp (ts). This guards against
+// allSessions snapshots overlapping — each 9-pt win pushes all session games so far.
+function uniqueGames(games) {
+  const seen = new Set();
+  return games.filter(g => {
+    if (!g.ts || seen.has(g.ts)) return false;
+    seen.add(g.ts); return true;
+  });
+}
+
+function allGamesDeduped() {
+  return uniqueGames([
+    ...(S.allSessions||[]).flatMap(s => s.games||[]),
+    ...(S.session?.games||[])
+  ]);
 }
 
 function buildChemMatrix(allGames) {
@@ -2580,7 +2745,7 @@ function renderInsights() {
   const player = _insightsPlayer;
   if (!player) return;
 
-  const allGames = [...(S.allSessions||[]).flatMap(s => s.games||[]), ...(S.session?.games||[])];
+  const allGames = allGamesDeduped();
   const games = allGames.filter(g => (g.teamA||[]).includes(player) || (g.teamB||[]).includes(player));
 
   const body = document.getElementById('insights-body');
@@ -2752,6 +2917,14 @@ function renderInsights() {
   html += insRow('Avg Extra Tricks', bookEff !== null ? `+${bookEff.toFixed(1)} surplus` : '—', '', 'extra-tricks');
   html += insRow('Avg Hands Won (when made)', avgHandsWon !== null ? avgHandsWon.toFixed(1) : '—', '', 'hands-won');
   html += insRow('Favorite Bid', favBid !== null ? `${favBid} (${favBidCount}×)` : '—', '', 'fav-bid');
+  // Win-Rate by Bid Level
+  const winByBidStr = [1,2,3,4,5,6,7].filter(b => byBid[b] && byBid[b].a >= 1).map(b => {
+    const r = byBid[b];
+    const wr = Math.round((r.a - r.s) / r.a * 100);
+    return `${b}: ${wr}%`;
+  }).join(' · ');
+
+  if (winByBidStr) html += insRow('Win Rate by Bid Level', winByBidStr, '', 'win-by-bid');
   if (setByBidStr) html += insRow('Set Rate by Bid Level', setByBidStr, '', 'set-by-bid');
   html += insRow('Clutch Score (bids in blitz)', clutchScore !== null ? `${clutchScore}%` : blitzBidGames.length < 3 ? 'Too few blitz bids' : '—', clutchScore !== null ? (clutchScore >= 55 ? 'pos' : clutchScore < 40 ? 'neg' : '') : '', 'clutch');
   html += insRow('Kamikaze', kamGames.length ? `${kamSucc} · avg $${kamROI >= 0 ? '+' : ''}${kamROI.toFixed(2)}` : '0', '', 'kamikaze');
@@ -2775,7 +2948,8 @@ function renderInsights() {
 
   // Section 3: Archetypes
   html += `<div class="insights-section"><div class="insights-section-title">Player Archetype</div>`;
-  html += insRow('Archetype', archetype, archetype==='Gambler' ? 'amb' : archetype==='Robinhood' ? 'pos' : archetype==='Anchor' ? 'pos' : '');
+  const archDefKey = archetype==='Gambler' ? 'arch-gambler' : archetype==='Robinhood' ? 'arch-robinhood' : archetype==='Anchor' ? 'arch-anchor' : 'arch-balanced';
+  html += insRow('Archetype', archetype, archetype==='Gambler' ? 'amb' : archetype==='Robinhood' ? 'pos' : archetype==='Anchor' ? 'pos' : '', archDefKey);
   html += insRow('Gambler Score', gamblerScore !== null ? `${gamblerScore} (avg bid × set%)` : bidGames.length < 5 ? 'Need ≥5 bids' : '0.00', '', 'gambler');
   html += insRow('Robinhood (blitz bid win%)', robinhoodScore !== null ? `${robinhoodScore}%` : blitzBidGames.length < 3 ? 'Need ≥3 blitz bids' : '—', robinhoodScore !== null ? (robinhoodScore >= 55 ? 'pos' : robinhoodScore < 40 ? 'neg' : '') : '', 'robinhood');
   html += insRow('Anchor (defense win%)', anchorScore !== null ? `${anchorScore}% · ${defensiveSets} sets forced` : defGames.length < 5 ? `Need ≥5 games · ${defensiveSets} sets forced` : '—', anchorScore !== null ? (anchorScore >= 60 ? 'pos' : anchorScore < 40 ? 'neg' : '') : '', 'anchor');
@@ -2872,6 +3046,7 @@ function applyRemoteData(data) {
   if (!data) return;
   // Ensure session always has a games array (guards against corrupted data)
   if (data.session && !Array.isArray(data.session.games)) data.session.games = [];
+  if (data.session && !data.session.rotationBaseline) data.session.rotationBaseline = {};
   if (!Array.isArray(data.allSessions)) data.allSessions = [];
   if (!data.allTimeStats || typeof data.allTimeStats !== 'object') data.allTimeStats = {};
   if (!data.allTimeMoney || typeof data.allTimeMoney !== 'object') data.allTimeMoney = {};
@@ -2914,6 +3089,17 @@ if (db) {
   if (el) { el.textContent = '⬤ local'; el.style.color = 'var(--amber)'; }
 }
 </script>
+
+<!-- Game recap toast -->
+<div class="game-toast" id="game-toast">
+  <div class="game-toast-top">
+    <span class="game-toast-icon" id="toast-icon"></span>
+    <span class="game-toast-result" id="toast-result"></span>
+    <span class="game-toast-flags" id="toast-flags"></span>
+  </div>
+  <div class="game-toast-money" id="toast-money"></div>
+  <div class="game-toast-bar"><div class="game-toast-bar-fill" id="toast-bar"></div></div>
+</div>
 
 <!-- Metric definition bottom sheet -->
 <div class="def-backdrop" id="def-backdrop" onclick="hideMetricDef()"></div>
