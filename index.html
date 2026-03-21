@@ -574,6 +574,8 @@ body {
 }
 .hands-btn:last-child { border-right: none; }
 .made-zone .hands-btn:last-child { border-right: none; }
+/* Keep border at the boundary between set and made zones */
+.set-zone .hands-btn:last-child { border-right: 2px solid var(--border-strong); }
 
 /* Bid-aware coloring — losing range */
 .hands-btn.bid-loss {
@@ -1194,6 +1196,54 @@ body { -webkit-text-size-adjust: 100%; }
   font-size: 9px; color: var(--gold-dim); font-family: 'DM Mono', monospace;
   margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border);
   text-align: center; letter-spacing: 0.05em; text-transform: uppercase;
+}
+
+/* ── Metric definition bottom sheet ── */
+.def-backdrop {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.55);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.22s;
+}
+.def-backdrop.open { opacity: 1; pointer-events: auto; }
+.def-sheet {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 501;
+  background: var(--felt-light);
+  border-radius: 18px 18px 0 0;
+  border-top: 1px solid var(--border-strong);
+  padding: 0 22px calc(28px + env(safe-area-inset-bottom, 0px));
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  max-height: 60vh; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.def-sheet.open { transform: translateY(0); }
+.def-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: var(--border-strong); margin: 12px auto 18px;
+}
+.def-sheet-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 19px; color: var(--gold-pale); margin-bottom: 10px;
+}
+.def-sheet-formula {
+  font-family: 'DM Mono', monospace; font-size: 11px; color: var(--teal-pale);
+  background: var(--felt-lighter); border: 1px solid var(--teal-border);
+  border-radius: var(--radius-sm); padding: 9px 12px;
+  margin-bottom: 12px; line-height: 1.6;
+}
+.def-sheet-formula-lbl {
+  font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--teal-dim); display: block; margin-bottom: 3px;
+}
+.def-sheet-desc { font-size: 13px; color: var(--cream); line-height: 1.7; }
+
+/* Tappable insights row */
+.insights-row.tappable { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.insights-row.tappable:active { background: rgba(201,168,76,0.06); border-radius: 4px; margin: 0 -4px; padding: 6px 4px; }
+.ins-info {
+  font-size: 9px; color: var(--gold-dim); margin-left: 4px;
+  font-family: 'DM Mono', monospace; opacity: 0.55; vertical-align: middle;
 }
 </style>
 </head>
@@ -1850,7 +1900,8 @@ function logGame() {
     delta, scoreA:s.scoreA, scoreB:s.scoreB,
     // store previous scores for undo
     prevScoreA, prevScoreB,
-    ts: Date.now()
+    ts: Date.now(),
+    rotationIncremented: false  // set to true below if rotation fires
   };
   s.games.push(game);
 
@@ -1875,6 +1926,7 @@ function logGame() {
         `+$${winPay.toFixed(2)}${losingInBlitz?' (blitz)':''}`,
         'Teams change — starting new rotation');
       s.rotationIdx++;
+      game.rotationIncremented = true;
     } else {
       showWinPopup('♠', `${winTeam} win!`,
         `+$${winPay.toFixed(2)}${losingInBlitz?' (blitz)':''}`,
@@ -1944,7 +1996,8 @@ function undoLastGame() {
   // remove that session record too
   if (S.allSessions.length && S.allSessions[S.allSessions.length-1].endedAt >= g.ts) {
     S.allSessions.pop();
-    if (s.rotationIdx > 0) s.rotationIdx--;
+    // Only undo the rotation increment if this specific game caused it
+    if (g.rotationIncremented && s.rotationIdx > 0) s.rotationIdx--;
   }
 
   dismissWinPopup();
@@ -2381,10 +2434,30 @@ function startSession() {
   if (S.players.length < 4) return alert('Need at least 4 players.');
   if (S.session && S.session.games && S.session.games.length > 0) {
     if (!confirm('Starting a new session will end the current one. Continue?')) return;
+    // Save current session to history before wiping (so History tab keeps it)
+    const lastGame = S.session.games[S.session.games.length - 1];
+    S.allSessions.push({
+      games: [...S.session.games],
+      money: {...S.session.money},
+      winTeam: 'Manual end',
+      endedAt: Date.now()
+    });
     mergeIntoAllTime();
   }
-  const g = id => parseFloat(document.getElementById(id).value);
-  const cfg = { pts:g('cfg-pts'), target:g('cfg-target'), win:g('cfg-win'), boston:g('cfg-boston'), cam:g('cfg-cam'), set:g('cfg-set'), blitz:g('cfg-blitz'), kw:g('cfg-kw'), kl:g('cfg-kl') };
+  const gv = id => parseFloat(document.getElementById(id).value);
+  const raw = { pts:gv('cfg-pts'), target:gv('cfg-target'), win:gv('cfg-win'), boston:gv('cfg-boston'), cam:gv('cfg-cam'), set:gv('cfg-set'), blitz:gv('cfg-blitz'), kw:gv('cfg-kw'), kl:gv('cfg-kl') };
+  const invalids = [];
+  if (!(raw.pts >= 1 && raw.pts <= 20)) invalids.push('Points to win (1–20)');
+  if (!(raw.target > 0)) invalids.push('Money target (must be > 0)');
+  if (!(raw.win > 0)) invalids.push('Win payout (must be > 0)');
+  if (!(raw.boston >= 0)) invalids.push('Boston bonus (must be ≥ 0)');
+  if (!(raw.cam >= 0)) invalids.push('Cambridge bonus (must be ≥ 0)');
+  if (!(raw.set >= 0)) invalids.push('Set penalty (must be ≥ 0)');
+  if (!(raw.blitz >= 1)) invalids.push('Blitz multiplier (must be ≥ 1)');
+  if (!(raw.kw > 0)) invalids.push('Kamikaze win multiplier (must be > 0)');
+  if (!(raw.kl > 0)) invalids.push('Kamikaze loss multiplier (must be > 0)');
+  if (invalids.length) return alert('Invalid config:\n• ' + invalids.join('\n• '));
+  const cfg = raw;
   S.cfg = cfg;
   S.session = { games:[], rotationIdx:0, scoreA:0, scoreB:0, money:{}, pStats:{}, cfg, startedAt:Date.now() };
   S.players.forEach(p => { S.session.money[p]=0; S.session.pStats[p]={wins:0,losses:0,sets:0,bostons:0,cams:0,bids:0,bidsMade:0,kamA:0,kamM:0}; });
@@ -2418,12 +2491,61 @@ function closeInsights() {
   _insightsPlayer = null;
 }
 
-function insRow(key, val, cls) {
+function insRow(key, val, cls, defKey) {
+  const info = defKey ? ` <span class="ins-info">ⓘ</span>` : '';
+  const tap = defKey ? ` tappable" onclick="showMetricDef('${defKey}'` : '';
+  const cls2 = tap ? `insights-row${tap})` : 'insights-row';
+  // Handle the class attribute carefully
+  if (defKey) {
+    return `<div class="insights-row tappable" onclick="showMetricDef('${defKey}')"><span class="insights-key">${key}${info}</span><span class="insights-val${cls?' '+cls:''}">${val}</span></div>`;
+  }
   return `<div class="insights-row"><span class="insights-key">${key}</span><span class="insights-val${cls?' '+cls:''}">${val}</span></div>`;
 }
 
+const METRIC_DEFS = {
+  'avg-bid': { title:'Average Bid', formula:'Sum of bid values ÷ Total bids placed', desc:'How aggressively you bid on average. Bid 1 means you needed 7 books; bid 7 means you called all 13. Higher values signal confidence—or overconfidence.' },
+  'bid-success': { title:'Bid Success Rate', formula:'Bids Made ÷ Total Bids', desc:'The % of your bids you actually made without getting set. Elite players sit above 65%. Below 50% means you\'re getting set more often than making it.' },
+  'set-rate': { title:'Set Rate', formula:'Sets ÷ Total Bids (= 1 − Bid Success Rate)', desc:'How often you get set when you bid. The inverse of Bid Success Rate. Low is better—below 20% is strong.' },
+  'margin': { title:'Avg Margin Above Bid', formula:'avg(Books Won − Bid − 6) on made bids', desc:'When you make a bid, how many extra books above the minimum did you win? A margin of +2 means you played it safe. High margins can mean you\'re bidding too conservatively.' },
+  'extra-tricks': { title:'Avg Extra Tricks', formula:'avg(Books Won − (Bid + 6)) on made bids', desc:'How many surplus books above your contract you capture when you make it. Efficient bidders push their bids closer to their true hand strength.' },
+  'hands-won': { title:'Avg Hands Won When Bidding', formula:'avg(Bidding team books) on made bids', desc:'The average number of books your team takes when you bid and make it. Ranges from Bid+6 up to 13. Combine with Avg Bid to see whether you\'re bidding your true strength.' },
+  'fav-bid': { title:'Favorite Bid', formula:'Most frequently chosen bid value', desc:'The bid level you reach for most often. Reflects your natural comfort zone and risk appetite at the table.' },
+  'set-by-bid': { title:'Set Rate by Bid Level', formula:'Sets ÷ Attempts at each bid value (1–7)', desc:'Breaks down your set rate per bid level. Useful for spotting which specific bid values consistently get you in trouble.' },
+  'clutch': { title:'Clutch Score', formula:'Win% on bids placed while team score is negative', desc:'How well you perform when your back is against the wall. Bidding from a negative score (blitz) is high-pressure—this shows whether you rise to the occasion. Requires ≥3 qualifying bids.' },
+  'kamikaze': { title:'Kamikaze', formula:'Made ÷ Attempted · Avg money impact per game', desc:'Kamikaze bids carry a 2× win/loss multiplier. Tracks your success rate and the average money gained or lost per kamikaze attempt.' },
+  'hot-hand': { title:'Hot Hand (Max Win Streak)', formula:'Longest consecutive run of game wins', desc:'Your longest unbroken sequence of wins across all recorded games. Includes games on both bidding and defending teams.' },
+  'gambler': { title:'Gambler Score', formula:'Avg Bid × Set Rate', desc:'A combined risk metric. High avg bid + high set rate = aggressive gambler. Low bid + low set rate = disciplined player. The Gambler archetype triggers at ≥1.2 with set rate >35%.' },
+  'robinhood': { title:'Robinhood Score', formula:'Win% on bids placed while team score is negative', desc:'Named for coming from behind. Measures how often you make your bid when your team is in blitz territory. Requires ≥3 qualifying bids to show.' },
+  'anchor': { title:'Anchor Score', formula:'Win% as the non-bidding (defending) team', desc:'How well your team stops opponents when you\'re not bidding. Also shows how many times you forced an opponent set while defending. Requires ≥5 defending games.' },
+  'momentum': { title:'Momentum Sensitivity', formula:'Win% after a win − Win% after a loss', desc:'Positive = you play better on a winning streak (hot hand effect). Negative = losses actually sharpen your focus. Requires ≥5 games following each outcome to calculate.' },
+  'bostons': { title:'Bostons', formula:'Games where bidding team won all 13 books', desc:'The rarest, most dominant outcome in Bid Whist. Your team bid and took every single trick in the hand. Earns a +$3 bonus (bidding team pays, opponents receive).' },
+  'cambridges': { title:'Cambridges', formula:'Games where bidding team won exactly 12 books', desc:'One book short of a Boston. Still worth a +$1 bonus for the bidding team.' },
+  'sets-taken': { title:'Total Sets Taken', formula:'Games where your bid failed (non-Kamikaze)', desc:'Total times your team was set while bidding. Each set costs the bidding team $2 (or $3 in blitz). Lower is better.' },
+  'rounds': { title:'9-pt Rounds on Record', formula:'Count of completed rounds stored in the database', desc:'How many full rounds (first team to reach 9 pts) are in history. Each entry represents one complete round of play. A rough proxy for overall experience.' },
+  'streak': { title:'Max Win Streak', formula:'Longest consecutive wins across all recorded games', desc:'Your personal best win streak. Counts wins on both bidding and defending teams.' },
+  'leaderboard': { title:'All-time Leaderboard', formula:'Ranked across Money, Win Rate, Bid Success, Bostons', desc:'Ranks all players across key metrics. Tap any column header to re-sort. The highlighted row is your own standing.' }
+};
+
+function showMetricDef(key) {
+  const def = METRIC_DEFS[key];
+  if (!def) return;
+  document.getElementById('def-title').textContent = def.title;
+  document.getElementById('def-formula').textContent = def.formula;
+  document.getElementById('def-desc').textContent = def.desc;
+  document.getElementById('def-backdrop').classList.add('open');
+  document.getElementById('def-sheet').classList.add('open');
+}
+
+function hideMetricDef() {
+  document.getElementById('def-backdrop').classList.remove('open');
+  document.getElementById('def-sheet').classList.remove('open');
+}
+
 function buildChemMatrix(allGames) {
-  const ps = S.players.slice(0, 4);
+  // Derive player list from actual game data so matrix is always accurate
+  const seen = new Set();
+  allGames.forEach(g => { (g.teamA||[]).forEach(p => seen.add(p)); (g.teamB||[]).forEach(p => seen.add(p)); });
+  const ps = [...seen].sort();
   const pairSt = {};
   const pk = (a, b) => [a,b].sort().join('|');
   allGames.forEach(g => {
@@ -2527,8 +2649,11 @@ function renderInsights() {
   let favBid = null, favBidCount = 0;
   Object.entries(byBid).forEach(([b, r]) => { if (r.a > favBidCount) { favBidCount = r.a; favBid = b; } });
 
-  // Book efficiency: avg extra hands above minimum when making
+  // Avg Extra Tricks (formerly "Book Efficiency"): avg hands above minimum bid requirement when making
   const bookEff = madeGames.length ? (madeGames.reduce((s,g) => s + (g.bidHands - (g.bid + 6)), 0) / madeGames.length) : null;
+
+  // Avg Hands Won when bidding (all bids made, non-kamikaze)
+  const avgHandsWon = madeGames.length ? (madeGames.reduce((s,g) => s + g.bidHands, 0) / madeGames.length) : null;
 
   // ── Section 2: Partnership ──────────────────────────
   const partners = S.players.filter(p => p !== player);
@@ -2556,6 +2681,7 @@ function renderInsights() {
     : null;
 
   // Gambler Score: Avg Bid × Set Rate — high bids + high risk = gambler
+  // Threshold 1.2 (e.g. avg bid 3 × set rate 40% = 1.20) with setRate guard
   const gamblerScore = (bidGames.length >= 5 && avgBid > 0 && setRate !== null)
     ? (avgBid * setRate / 100).toFixed(2)
     : null;
@@ -2565,6 +2691,8 @@ function renderInsights() {
   const anchorScore = defGames.length >= 5
     ? Math.round(defGames.filter(g => didWin(g, player)).length / defGames.length * 100)
     : null;
+  // Defensive sets: times the player's defending team set the bidding opponents
+  const defensiveSets = defGames.filter(g => !g.madeIt && !g.kamikaze).length;
 
   // Momentum: win rate after win vs after loss
   let aWW=0, aWTotal=0, aLW=0, aLTotal=0;
@@ -2576,12 +2704,25 @@ function renderInsights() {
     ? Math.round((aWW/aWTotal - aLW/aLTotal)*100)
     : null;
 
-  // Archetype assignment
-  let archetype = 'Balanced', archClass = 'arch-balanced';
+  // Archetype assignment — pick the strongest match relative to its threshold
+  // Gambler: threshold 1.2 + setRate > 35%; Robinhood: 55%; Anchor: 60%
   const gamblerNum = parseFloat(gamblerScore) || 0;
-  if (gamblerNum >= 0.8) { archetype = 'Gambler'; archClass = 'arch-gambler'; }
-  else if (robinhoodScore !== null && robinhoodScore >= 55 && blitzBidGames.length >= 3) { archetype = 'Robinhood'; archClass = 'arch-robinhood'; }
-  else if (anchorScore !== null && anchorScore >= 60 && defGames.length >= 5) { archetype = 'Anchor'; archClass = 'arch-anchor'; }
+  const gamblerQual = gamblerNum >= 1.2 && (setRate || 0) > 35;
+  const robinhoodQual = robinhoodScore !== null && robinhoodScore >= 55 && blitzBidGames.length >= 3;
+  const anchorQual = anchorScore !== null && anchorScore >= 60 && defGames.length >= 5;
+
+  // Score each against threshold to pick the strongest relative fit
+  const gamblerRelative = gamblerQual ? (gamblerNum - 1.2) / 1.2 : -1;
+  const robinhoodRelative = robinhoodQual ? (robinhoodScore - 55) / 55 : -1;
+  const anchorRelative = anchorQual ? (anchorScore - 60) / 60 : -1;
+
+  let archetype = 'Balanced', archClass = 'arch-balanced';
+  const best = Math.max(gamblerRelative, robinhoodRelative, anchorRelative);
+  if (best > -1) {
+    if (best === gamblerRelative) { archetype = 'Gambler'; archClass = 'arch-gambler'; }
+    else if (best === robinhoodRelative) { archetype = 'Robinhood'; archClass = 'arch-robinhood'; }
+    else { archetype = 'Anchor'; archClass = 'arch-anchor'; }
+  }
 
   badgeEl.innerHTML = `<div class="insights-archetype-badge ${archClass}">${archetype}</div>`;
 
@@ -2604,16 +2745,17 @@ function renderInsights() {
 
   // Section 1: Core Bidding
   html += `<div class="insights-section"><div class="insights-section-title">Core Bidding</div>`;
-  html += insRow('Avg Bid', bidGames.length ? avgBid.toFixed(1) : '—');
-  html += insRow('Bid Success Rate', bidSucc !== null ? `${bidSucc}%` : '—', bidSucc !== null ? (bidSucc >= 60 ? 'pos' : bidSucc < 45 ? 'neg' : '') : '');
-  html += insRow('Set Rate', setRate !== null ? `${setRate}%` : '—', setRate !== null ? (setRate >= 40 ? 'neg' : setRate <= 20 ? 'pos' : '') : '');
-  html += insRow('Avg Margin Above Bid', avgMargin !== null ? `+${avgMargin.toFixed(1)} books` : '—', 'gold');
-  html += insRow('Book Efficiency', bookEff !== null ? `+${bookEff.toFixed(1)} avg` : '—');
-  html += insRow('Favorite Bid', favBid !== null ? `${favBid} (${favBidCount}×)` : '—');
-  if (setByBidStr) html += insRow('Set Rate by Bid Level', setByBidStr);
-  html += insRow('Clutch Score (bids in blitz)', clutchScore !== null ? `${clutchScore}%` : blitzBidGames.length < 3 ? 'Too few blitz bids' : '—', clutchScore !== null ? (clutchScore >= 55 ? 'pos' : clutchScore < 40 ? 'neg' : '') : '');
-  html += insRow('Kamikaze', kamGames.length ? `${kamSucc} · avg $${kamROI >= 0 ? '+' : ''}${kamROI.toFixed(2)}` : '0');
-  html += insRow('Hot Hand (max win streak)', `${maxStreak}`, maxStreak >= 5 ? 'gold' : '');
+  html += insRow('Avg Bid', bidGames.length ? avgBid.toFixed(1) : '—', '', 'avg-bid');
+  html += insRow('Bid Success Rate', bidSucc !== null ? `${bidSucc}%` : '—', bidSucc !== null ? (bidSucc >= 60 ? 'pos' : bidSucc < 45 ? 'neg' : '') : '', 'bid-success');
+  html += insRow('Set Rate', setRate !== null ? `${setRate}%` : '—', setRate !== null ? (setRate >= 40 ? 'neg' : setRate <= 20 ? 'pos' : '') : '', 'set-rate');
+  html += insRow('Avg Margin Above Bid', avgMargin !== null ? `+${avgMargin.toFixed(1)} books` : '—', 'gold', 'margin');
+  html += insRow('Avg Extra Tricks', bookEff !== null ? `+${bookEff.toFixed(1)} surplus` : '—', '', 'extra-tricks');
+  html += insRow('Avg Hands Won (when made)', avgHandsWon !== null ? avgHandsWon.toFixed(1) : '—', '', 'hands-won');
+  html += insRow('Favorite Bid', favBid !== null ? `${favBid} (${favBidCount}×)` : '—', '', 'fav-bid');
+  if (setByBidStr) html += insRow('Set Rate by Bid Level', setByBidStr, '', 'set-by-bid');
+  html += insRow('Clutch Score (bids in blitz)', clutchScore !== null ? `${clutchScore}%` : blitzBidGames.length < 3 ? 'Too few blitz bids' : '—', clutchScore !== null ? (clutchScore >= 55 ? 'pos' : clutchScore < 40 ? 'neg' : '') : '', 'clutch');
+  html += insRow('Kamikaze', kamGames.length ? `${kamSucc} · avg $${kamROI >= 0 ? '+' : ''}${kamROI.toFixed(2)}` : '0', '', 'kamikaze');
+  html += insRow('Hot Hand (max win streak)', `${maxStreak}`, maxStreak >= 5 ? 'gold' : '', 'hot-hand');
   html += `</div>`;
 
   // Section 2: Partnership
@@ -2622,8 +2764,9 @@ function renderInsights() {
     const st = pStats[q];
     if (!st || st.g === 0) { html += insRow(`with ${q}`, 'No data'); return; }
     const wr = Math.round(st.w / st.g * 100);
-    const nc = st.net >= 0 ? 'pos' : 'neg';
-    const detail = `${wr}% · ${st.w}W/${st.g - st.w}L · $${st.net >= 0 ? '+' : ''}${st.net.toFixed(2)}`;
+    const perGame = st.g ? st.net / st.g : 0;
+    const netStr = `$${st.net >= 0 ? '+' : ''}${st.net.toFixed(0)} ($${perGame >= 0 ? '+' : ''}${perGame.toFixed(1)}/g)`;
+    const detail = `${wr}% · ${st.w}W/${st.g - st.w}L · ${netStr}`;
     html += insRow(`with ${q}`, st.g >= 5 ? detail : `${detail} (${st.g}g)`, st.g >= 5 ? (wr >= 55 ? 'pos' : wr <= 40 ? 'neg' : '') : '');
   });
   html += `<div style="margin-top:10px"><div style="font-size:10px;color:var(--cream-dim);font-family:'DM Mono',monospace;margin-bottom:4px;letter-spacing:0.05em">Win % for every pairing</div>
@@ -2633,23 +2776,90 @@ function renderInsights() {
   // Section 3: Archetypes
   html += `<div class="insights-section"><div class="insights-section-title">Player Archetype</div>`;
   html += insRow('Archetype', archetype, archetype==='Gambler' ? 'amb' : archetype==='Robinhood' ? 'pos' : archetype==='Anchor' ? 'pos' : '');
-  html += insRow('Gambler Score', gamblerScore !== null ? `${gamblerScore} (avg bid × set%)` : bidGames.length < 5 ? 'Need ≥5 bids' : '0.00');
-  html += insRow('Robinhood (blitz bid win%)', robinhoodScore !== null ? `${robinhoodScore}%` : blitzBidGames.length < 3 ? 'Need ≥3 blitz bids' : '—', robinhoodScore !== null ? (robinhoodScore >= 55 ? 'pos' : robinhoodScore < 40 ? 'neg' : '') : '');
-  html += insRow('Anchor (defense win%)', anchorScore !== null ? `${anchorScore}%` : defGames.length < 5 ? 'Need ≥5 games' : '—', anchorScore !== null ? (anchorScore >= 60 ? 'pos' : anchorScore < 40 ? 'neg' : '') : '');
-  html += insRow('Momentum Sensitivity', momentumDiff !== null ? `${momentumDiff > 0 ? '+' : ''}${momentumDiff}% win↑ after a win` : 'Need more data', momentumDiff !== null ? (momentumDiff > 10 ? 'gold' : momentumDiff < -10 ? 'neg' : '') : '');
+  html += insRow('Gambler Score', gamblerScore !== null ? `${gamblerScore} (avg bid × set%)` : bidGames.length < 5 ? 'Need ≥5 bids' : '0.00', '', 'gambler');
+  html += insRow('Robinhood (blitz bid win%)', robinhoodScore !== null ? `${robinhoodScore}%` : blitzBidGames.length < 3 ? 'Need ≥3 blitz bids' : '—', robinhoodScore !== null ? (robinhoodScore >= 55 ? 'pos' : robinhoodScore < 40 ? 'neg' : '') : '', 'robinhood');
+  html += insRow('Anchor (defense win%)', anchorScore !== null ? `${anchorScore}% · ${defensiveSets} sets forced` : defGames.length < 5 ? `Need ≥5 games · ${defensiveSets} sets forced` : '—', anchorScore !== null ? (anchorScore >= 60 ? 'pos' : anchorScore < 40 ? 'neg' : '') : '', 'anchor');
+  html += insRow('Momentum Sensitivity', momentumDiff !== null ? `${momentumDiff > 0 ? '+' : ''}${momentumDiff}% win↑ after a win` : 'Need more data', momentumDiff !== null ? (momentumDiff > 10 ? 'gold' : momentumDiff < -10 ? 'neg' : '') : '', 'momentum');
   html += `</div>`;
 
   // Section 4: All-time Records
   html += `<div class="insights-section"><div class="insights-section-title">All-time Records</div>`;
-  html += insRow('Bostons', `${bostonCount}`, bostonCount >= 2 ? 'pos' : '');
-  html += insRow('Cambridges', `${camCount}`, camCount >= 3 ? 'amb' : '');
-  html += insRow('Total Sets Taken', `${totalSets}`, totalSets >= 5 ? 'neg' : '');
-  html += insRow('9-pt Rounds on Record', S.allSessions.length ? `${S.allSessions.length}` : '0');
-  html += insRow('Max Win Streak', `${maxStreak}`, maxStreak >= 6 ? 'gold' : '');
-  html += insRow('Kamikaze Record', kamGames.length ? `${kamSucc} made` : 'Never attempted');
+  html += insRow('Bostons', `${bostonCount}`, bostonCount >= 2 ? 'pos' : '', 'bostons');
+  html += insRow('Cambridges', `${camCount}`, camCount >= 3 ? 'amb' : '', 'cambridges');
+  html += insRow('Total Sets Taken', `${totalSets}`, totalSets >= 5 ? 'neg' : '', 'sets-taken');
+  html += insRow('9-pt Rounds on Record', S.allSessions.length ? `${S.allSessions.length}` : '0', '', 'rounds');
+  html += insRow('Max Win Streak', `${maxStreak}`, maxStreak >= 6 ? 'gold' : '', 'streak');
+  html += insRow('Kamikaze Record', kamGames.length ? `${kamSucc} made` : 'Never attempted', '', 'kamikaze');
   html += `</div>`;
 
+  // ── Section 5: All-time Leaderboard ─────────────────
+  // Compute stats for every player who appears in any game
+  const allPlayerNames = [...new Set(allGames.flatMap(g => [...(g.teamA||[]), ...(g.teamB||[])]))].sort();
+  if (allPlayerNames.length >= 2) {
+    const lbData = allPlayerNames.map(p => {
+      const pg = allGames.filter(g => (g.teamA||[]).includes(p) || (g.teamB||[]).includes(p));
+      if (pg.length === 0) return null;
+      const wins = pg.filter(g => didWin(g, p)).length;
+      const wr = Math.round(wins / pg.length * 100);
+      const pbids = pg.filter(g => g.bidder === p && !g.kamikaze);
+      const pmade = pbids.filter(g => g.madeIt).length;
+      const bidSuccP = pbids.length ? Math.round(pmade / pbids.length * 100) : null;
+      const bos = pg.filter(g => g.boston && ((g.bidTeam==='A'?g.teamA:g.teamB)||[]).includes(p)).length;
+      const mon = (S.allTimeMoney?.[p]||0) + (S.session?.money?.[p]||0);
+      return { p, games:pg.length, wins, wr, bidSucc:bidSuccP, bids:pbids.length, bos, mon };
+    }).filter(Boolean);
+
+    // Sort state — default by money desc
+    const lbSortKey = '_lbSort_' + player;
+    if (!window[lbSortKey]) window[lbSortKey] = { col:'mon', asc:false };
+    const ss2 = window[lbSortKey];
+    lbData.sort((a, b) => {
+      const av = a[ss2.col] ?? -Infinity, bv = b[ss2.col] ?? -Infinity;
+      return ss2.asc ? av - bv : bv - av;
+    });
+
+    function lbTh(col, label) {
+      const active = ss2.col === col;
+      const arrow = active ? (ss2.asc ? ' ▲' : ' ▼') : '';
+      return `<th onclick="sortLeaderboard('${player}','${col}')" style="cursor:pointer;white-space:nowrap;${active?'color:var(--gold-pale)':''}">${label}${arrow}</th>`;
+    }
+
+    html += `<div class="insights-section"><div class="insights-section-title" style="display:flex;align-items:center;gap:8px">All-time Leaderboard <span class="ins-info" onclick="showMetricDef('leaderboard')" style="cursor:pointer;font-size:11px">ⓘ</span></div>`;
+    html += `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:340px">
+      <thead><tr style="border-bottom:1px solid var(--border)">
+        <th style="text-align:left;padding:6px 4px;color:var(--cream-dim);font-weight:500">Player</th>
+        ${lbTh('mon','$')}${lbTh('wr','W%')}${lbTh('wins','W')}${lbTh('bidSucc','Bid%')}${lbTh('bos','Bos')}${lbTh('games','G')}
+      </tr></thead><tbody>`;
+
+    lbData.forEach((row, i) => {
+      const isSelf = row.p === player;
+      const rank = i + 1;
+      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+      const rowStyle = isSelf ? 'background:rgba(201,168,76,0.08);font-weight:600' : '';
+      const monCls = row.mon >= 0 ? 'color:var(--teal-pale)' : 'color:var(--red-bright)';
+      html += `<tr style="border-bottom:1px solid var(--border);${rowStyle}">
+        <td style="padding:7px 4px;white-space:nowrap">${medal} ${row.p}${isSelf ? ' ←' : ''}</td>
+        <td style="text-align:right;padding:7px 4px;${monCls}">$${row.mon >= 0 ? '+' : ''}${row.mon.toFixed(0)}</td>
+        <td style="text-align:right;padding:7px 4px">${row.wr}%</td>
+        <td style="text-align:right;padding:7px 4px">${row.wins}</td>
+        <td style="text-align:right;padding:7px 4px">${row.bidSucc !== null ? row.bidSucc+'%' : '—'}</td>
+        <td style="text-align:right;padding:7px 4px;color:var(--gold)">${row.bos || 0}</td>
+        <td style="text-align:right;padding:7px 4px;color:var(--cream-dim)">${row.games}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+  }
+
   body.innerHTML = html;
+}
+
+function sortLeaderboard(player, col) {
+  const key = '_lbSort_' + player;
+  if (!window[key]) window[key] = { col:'mon', asc:false };
+  const ss2 = window[key];
+  if (ss2.col === col) { ss2.asc = !ss2.asc; }
+  else { ss2.col = col; ss2.asc = false; }
+  renderInsights();
 }
 
 // ── Init ──────────────────────────────────────────
@@ -2704,5 +2914,17 @@ if (db) {
   if (el) { el.textContent = '⬤ local'; el.style.color = 'var(--amber)'; }
 }
 </script>
+
+<!-- Metric definition bottom sheet -->
+<div class="def-backdrop" id="def-backdrop" onclick="hideMetricDef()"></div>
+<div class="def-sheet" id="def-sheet">
+  <div class="def-handle"></div>
+  <div class="def-sheet-title" id="def-title"></div>
+  <div class="def-sheet-formula">
+    <span class="def-sheet-formula-lbl">Formula</span>
+    <span id="def-formula"></span>
+  </div>
+  <div class="def-sheet-desc" id="def-desc"></div>
+</div>
 </body>
 </html>
