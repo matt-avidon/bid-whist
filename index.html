@@ -1156,7 +1156,16 @@ let S = {
   allSessions: []
 };
 
-function load() { try { const d=localStorage.getItem('whist4'); if(d) S=JSON.parse(d); } catch(e){} }
+function load() {
+  try {
+    const d = localStorage.getItem('whist4');
+    if (d) {
+      S = JSON.parse(d);
+      if (S.session && !Array.isArray(S.session.games)) S.session.games = [];
+      if (!Array.isArray(S.allSessions)) S.allSessions = [];
+    }
+  } catch(e) {}
+}
 
 let _saveTimer = null;
 function save() {
@@ -1903,7 +1912,7 @@ function importData() {
 
 function startSession() {
   if (S.players.length < 4) return alert('Need at least 4 players.');
-  if (S.session && S.session.games.length > 0) {
+  if (S.session && S.session.games && S.session.games.length > 0) {
     if (!confirm('Starting a new session will end the current one. Continue?')) return;
   }
   const g = id => parseFloat(document.getElementById(id).value);
@@ -1931,6 +1940,9 @@ if (S.session) { nav('play'); } else { nav('setup'); }
 
 function applyRemoteData(data) {
   if (!data) return;
+  // Ensure session always has a games array (guards against corrupted data)
+  if (data.session && !Array.isArray(data.session.games)) data.session.games = [];
+  if (!Array.isArray(data.allSessions)) data.allSessions = [];
   S = data;
   localStorage.setItem('whist4', JSON.stringify(S));
   const active = document.querySelector('.view.active');
