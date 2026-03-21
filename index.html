@@ -2558,8 +2558,8 @@ function renderPlay() {
     const totalCls = totalM>0?'color:var(--teal-pale)':totalM<0?'color:var(--red-bright)':'color:var(--cream-dim)';
     const pct = Math.max(0, Math.min(100, Math.abs(rotM) / Math.max(1, target) * 100));
     const barCls = rotM >= 0 ? 'pos' : 'neg';
-    return `<div class="money-player-card">
-      <div class="money-name">${p}</div>
+    return `<div class="money-player-card" onclick="openInsights('${p.replace(/'/g,"\\'")}') " style="cursor:pointer;-webkit-tap-highlight-color:transparent">
+      <div class="money-name">${p} <span style="font-size:9px;color:var(--cream-dim);font-family:'DM Mono',monospace">→</span></div>
       <div class="money-amt ${rotCls}">$${rotM.toFixed(2)}</div>
       <div style="font-size:9px;font-family:'DM Mono',monospace;color:var(--cream-dim);margin-top:1px">This rotation</div>
       <div class="money-progress-wrap" style="margin:3px 0"><div class="money-progress-fill ${barCls}" style="width:${pct}%"></div></div>
