@@ -1341,7 +1341,7 @@ body { -webkit-text-size-adjust: 100%; }
 .trend-stat-label { font-size: 12px; color: var(--cream-dim); }
 .trend-stat-val { font-size: 13px; font-weight: 500; font-family: 'DM Mono', monospace; color: var(--cream); }
 .trend-sparkrow {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
   margin-top: 10px;
 }
 .trend-spark-cell {
@@ -1351,6 +1351,28 @@ body { -webkit-text-size-adjust: 100%; }
 .trend-spark-cell svg { display: block; width: 100%; margin-top: 4px; }
 .trend-spark-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--cream-dim); font-family: 'DM Mono', monospace; }
 .trend-spark-val { font-size: 14px; font-weight: 500; font-family: 'DM Mono', monospace; color: var(--cream); margin-top: 2px; }
+.trend-window-row {
+  display: flex; gap: 6px; padding: 6px 16px 0; flex-wrap: wrap;
+}
+.trend-win-btn {
+  background: var(--felt-lighter); border: 1px solid var(--border);
+  color: var(--cream-dim); font-size: 10px; font-family: 'DM Mono', monospace;
+  padding: 4px 10px; border-radius: 20px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: all 0.15s;
+}
+.trend-win-btn.active {
+  background: rgba(201,168,76,0.12); border-color: var(--gold-dim); color: var(--gold);
+}
+.trend-legend {
+  display: flex; gap: 10px; flex-wrap: wrap; padding: 8px 12px 10px;
+  font-size: 11px; font-family: 'DM Sans', sans-serif; align-items: center;
+}
+.trend-legend-dot {
+  width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+  vertical-align: middle; margin-right: 3px; flex-shrink: 0;
+}
+.trend-legend-name { color: var(--cream-dim); }
+.trend-legend-name.bold { color: var(--cream); font-weight: 600; }
 .insights-archetype-badge {
   display: inline-block; padding: 3px 10px; border-radius: 20px;
   font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif;
@@ -2365,8 +2387,8 @@ function logGame() {
     const winPay = cfg.win * sessionBlitzMult;
     const winTeamPlayers = winTeamIsA ? [rot[0],rot[1]] : [rot[2],rot[3]];
     const loseTeamPlayers = winTeamIsA ? [rot[2],rot[3]] : [rot[0],rot[1]];
-    winTeamPlayers.forEach(p => s.money[p] = (s.money[p]||0) + winPay);
-    loseTeamPlayers.forEach(p => s.money[p] = (s.money[p]||0) - winPay);
+    winTeamPlayers.forEach(p => { s.money[p] = (s.money[p]||0) + winPay; game.delta[p] = (game.delta[p]||0) + winPay; });
+    loseTeamPlayers.forEach(p => { s.money[p] = (s.money[p]||0) - winPay; game.delta[p] = (game.delta[p]||0) - winPay; });
 
     S.allSessions.push({ games:[...s.games], money:{...s.money}, winTeam, endedAt:Date.now() });
 
@@ -3151,6 +3173,8 @@ function toggleHistorySession(key) {
 let _insightsPlayer = null;
 let _insightsTab = 'overview';
 let _trendMetric = 'winrate';
+let _trendWindow = 'rolling'; // 'raw' | 'rolling'
+let _trendH2hOpponent = null;
 
 function setInsightsTab(tab) {
   _insightsTab = tab;
@@ -3237,7 +3261,8 @@ const METRIC_DEFS = {
   'kwr': { title:'Kamikaze Win Rate (KWR)', formula:'Kamikaze Made ÷ Total Kamikaze Attempts', desc:'The % of your Kamikaze bids that you actually made. Kamikaze is high-stakes, so you want this above 50%. Combined with KROI, it tells you whether the risk is worth taking.' },
   'pwr-m9': { title:'Partnership Win Rate (M9)', formula:'Wins with partner ÷ Games with partner', desc:'Your W/L record specifically when paired with this person. A strong pair will be above 55% together. Note this can be influenced by who your opponents were — use the full Chemistry Matrix for context.' },
   'pnm-m10': { title:'Partnership Net Money (M10)', formula:'Sum(your money delta) for all games with this partner', desc:'Total dollars you\'ve won or lost specifically when playing with this partner. Because partners always win/lose the same amount, this also equals your partner\'s money from your games together. Positive = profitable pairing; negative = this combo is costly.' },
-  'confidence': { title:'Confidence', formula:'min(Games Played ÷ 50, 100%)', desc:'How statistically reliable the metrics are. At 50+ games, every metric has enough data to be meaningful. Below 50%, treat metrics as directional hints, not hard facts. The Phase 1 metrics become unlocked at 20 games; full confidence is reached at 50.' }
+  'confidence': { title:'Confidence', formula:'min(Games Played ÷ 50, 100%)', desc:'How statistically reliable the metrics are. At 50+ games, every metric has enough data to be meaningful. Below 50%, treat metrics as directional hints, not hard facts. The Phase 1 metrics become unlocked at 20 games; full confidence is reached at 50.' },
+  'warp': { title:'WARP — Wins Above Replacement Partner', formula:'avg(outcome − partner_WR_without_you) × 100 over all games', desc:'Measures how much better (or worse) your team wins compared to what your partner\'s replacement-level partner would produce. For each game, the marginal is: your outcome (1=win, 0=loss) minus your partner\'s baseline win rate in games without you (default 0.50 if partner has <5 such games). WARP is the average marginal scaled to per-100-games. Positive = you elevate your partners; negative = you may be a drag. Requires ≥30 games.' }
 };
 
 function showMetricDef(key) {
@@ -3391,6 +3416,33 @@ function computeBPS(m, allMetrics) {
   return bfs * (playerAbPba / leagueAvg);
 }
 
+// WARP — Wins Above Replacement Partner (per 100 games)
+function computeWARP(p, allGames) {
+  function winCheck(g, player) {
+    const bt = g.bidTeam==='A' ? g.teamA : g.teamB;
+    const isBid = (bt||[]).includes(player);
+    return isBid ? (g.kamikaze ? g.kamOutcome==='made' : g.madeIt) : (g.kamikaze ? g.kamOutcome!=='made' : !g.madeIt);
+  }
+  const pGames = allGames.filter(g => (g.teamA||[]).includes(p) || (g.teamB||[]).includes(p));
+  if (pGames.length < 30) return null;
+  let totalMarginal = 0, count = 0;
+  pGames.forEach(g => {
+    const myTeam = (g.teamA||[]).includes(p) ? (g.teamA||[]) : (g.teamB||[]);
+    const partner = myTeam.find(q => q !== p);
+    if (!partner) return;
+    const withoutP = allGames.filter(g2 =>
+      ((g2.teamA||[]).includes(partner) || (g2.teamB||[]).includes(partner)) &&
+      !((g2.teamA||[]).includes(p) || (g2.teamB||[]).includes(p))
+    );
+    const baseWR = withoutP.length >= 5
+      ? withoutP.filter(g2 => winCheck(g2, partner)).length / withoutP.length
+      : 0.50;
+    totalMarginal += (winCheck(g, p) ? 1 : 0) - baseWR;
+    count++;
+  });
+  return count > 0 ? (totalMarginal / count) * 100 : null;
+}
+
 // Deduplicate an array of game records by timestamp (ts). This guards against
 // allSessions snapshots overlapping — each 9-pt win pushes all session games so far.
 function uniqueGames(games) {
@@ -3538,6 +3590,12 @@ function renderInsightsAdvanced(player, games, allGames) {
   const bpsCls  = bps !== null ? (bps >= 1.5 ? 'gold' : bps >= 1.0 ? 'pos' : 'neg') : 'dim';
   const bpsBadge = bps !== null && bps >= 1.5 ? '<div class="ins-mc-badge">🏆 Elite</div>' : bps !== null && bps >= 1.0 ? '<div class="ins-mc-badge">Above avg</div>' : '';
   html += `<div class="ins-metric-cell wide" data-def="bps"><div class="ins-mc-label">Bid Performance Score</div><div class="ins-mc-val ${bpsCls}">${bpsDisp}</div><div class="ins-mc-sub">Bid frequency × bid power vs league · 1.0 = avg · Elite > 1.5</div>${bpsBadge}</div>`;
+
+  const warp = computeWARP(player, allGames);
+  const warpDisp = warp !== null ? `${warp >= 0 ? '+' : ''}${warp.toFixed(1)}` : games.length < 30 ? `Need ${30 - games.length} more games` : '—';
+  const warpCls  = warp !== null ? (warp >= 5 ? 'pos' : warp <= -5 ? 'neg' : '') : 'dim';
+  const warpBadge = warp !== null && warp >= 10 ? '<div class="ins-mc-badge">🔥 Elite partner</div>' : warp !== null && warp <= -10 ? '<div class="ins-mc-badge neg">Below avg</div>' : '';
+  html += `<div class="ins-metric-cell" data-def="warp"><div class="ins-mc-label">WARP</div><div class="ins-mc-val ${warpCls}">${warpDisp}</div><div class="ins-mc-sub">Wins above replacement partner · per 100g</div>${warpBadge}</div>`;
 
   const ceilDisp = m.bidCeiling !== null ? `Bid ${m.bidCeiling}` : m.G >= 20 ? 'Not found yet' : '—';
   const ceilCls  = m.bidCeiling !== null ? (m.bidCeiling >= 5 ? 'pos' : m.bidCeiling <= 3 ? 'neg' : '') : 'dim';
@@ -3809,6 +3867,20 @@ function selectTrendMetric(m) {
   _trendMetric = m;
   renderInsights();
 }
+function selectTrendWindow(w) {
+  _trendWindow = w;
+  renderInsights();
+}
+function selectH2hOpponent(opp) {
+  _trendH2hOpponent = opp;
+  renderInsights();
+}
+function rollingAvg(series, window) {
+  return series.map((_, i) => {
+    const slice = series.slice(Math.max(0, i - window + 1), i + 1).filter(v => v !== null);
+    return slice.length >= Math.min(3, window) ? slice.reduce((a,b)=>a+b,0)/slice.length : null;
+  });
+}
 
 function makeTrendSVG(data, yMin, yMax, color, formatY) {
   if (data.length < 2) return '';
@@ -3887,77 +3959,255 @@ function makeSparkSVG(data, color) {
   </svg>`;
 }
 
-function renderInsightsTrend(player, games) {
-  const body = document.getElementById('insights-body');
+function makeMultiLineSVG(seriesArr, yMin, yMax, formatY, annotations) {
+  const valid = seriesArr.filter(s => s.data && s.data.length >= 2);
+  if (!valid.length) return '';
+  const W = 320, H = 140;
+  const PL = 44, PR = 10, PT = 12, PB = 28;
+  const iW = W - PL - PR, iH = H - PT - PB;
+  const maxLen = Math.max(...valid.map(s => s.data.length));
+  const range = (yMax - yMin) || 1;
+  const xOf = i => PL + (i / (maxLen - 1)) * iW;
+  const yOf = v => PT + iH - ((Math.max(yMin, Math.min(yMax, v)) - yMin) / range) * iH;
+  const yLabels = [yMin, (yMin+yMax)/2, yMax].map(v => ({ y: yOf(v).toFixed(1), label: formatY(v) }));
 
-  // Sort games by timestamp
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="height:${H}px">`;
+  svg += yLabels.map(l => `<line x1="${PL}" y1="${l.y}" x2="${W-PR}" y2="${l.y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`).join('');
+  if (yMin < 0 && yMax > 0) {
+    const zy = yOf(0).toFixed(1);
+    svg += `<line x1="${PL}" y1="${zy}" x2="${W-PR}" y2="${zy}" stroke="rgba(255,255,255,0.2)" stroke-width="1" stroke-dasharray="3 2"/>`;
+  }
+  (annotations||[]).forEach(idx => {
+    if (idx < 0 || idx >= maxLen) return;
+    const ax = xOf(idx).toFixed(1);
+    svg += `<line x1="${ax}" y1="${PT}" x2="${ax}" y2="${PT+iH}" stroke="rgba(255,255,255,0.18)" stroke-width="1" stroke-dasharray="3 2"/>`;
+  });
+  // Draw non-highlighted first, highlighted on top
+  [...valid].sort((a,b) => (a.highlight?1:-1) - (b.highlight?1:-1)).forEach(s => {
+    const pts = s.data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ');
+    svg += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="${s.highlight?2.5:1.5}" stroke-linejoin="round" stroke-linecap="round" opacity="${s.highlight?1:0.45}"/>`;
+    if (s.highlight) {
+      const last = s.data[s.data.length-1];
+      svg += `<circle cx="${xOf(s.data.length-1).toFixed(1)}" cy="${yOf(last).toFixed(1)}" r="4" fill="${s.color}"/>`;
+    }
+  });
+  svg += yLabels.map(l => `<text x="${PL-4}" y="${parseFloat(l.y)+4}" text-anchor="end" font-size="8" fill="rgba(255,255,255,0.35)" font-family="monospace">${l.label}</text>`).join('');
+  svg += `<line x1="${PL}" y1="${PT}" x2="${PL}" y2="${PT+iH}" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>`;
+  svg += `<line x1="${PL}" y1="${PT+iH}" x2="${W-PR}" y2="${PT+iH}" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>`;
+  svg += `</svg>`;
+  return svg;
+}
+
+function renderInsightsTrend(player, games, allGames) {
+  const body = document.getElementById('insights-body');
   const sorted = [...games].sort((a, b) => (a.ts||0) - (b.ts||0));
 
-  // Build rolling series for each metric
-  const seriesWR = [], seriesPBA = [], seriesAB = [], seriesSR = [], seriesBR = [];
+  const MIN_GAMES = 10;
+  if (sorted.length < MIN_GAMES) {
+    body.innerHTML = `<div style="padding:32px 16px;text-align:center">
+      <div style="font-size:32px;margin-bottom:12px">📈</div>
+      <div style="font-size:15px;color:var(--cream);margin-bottom:8px">Building your trend data…</div>
+      <div style="font-size:12px;color:var(--cream-dim);margin-bottom:16px">${sorted.length} of ${MIN_GAMES} games needed</div>
+      <div style="background:var(--felt-lighter);border-radius:6px;height:6px;width:80%;margin:0 auto;overflow:hidden">
+        <div style="height:100%;background:var(--teal);border-radius:6px;width:${Math.round(sorted.length/MIN_GAMES*100)}%"></div>
+      </div>
+    </div>`;
+    return;
+  }
+
+  function didWin(g, p) {
+    const bt = g.bidTeam==='A' ? g.teamA : g.teamB;
+    const isBid = (bt||[]).includes(p);
+    return isBid ? (g.kamikaze ? g.kamOutcome==='made' : g.madeIt) : (g.kamikaze ? g.kamOutcome!=='made' : !g.madeIt);
+  }
+
+  // ── Series computations ─────────────────────────────
+  const bidOutcomes = [];
   let wins = 0, bids = 0, bidsMade = 0, bidSum = 0, sets = 0;
+  let beNum = 0, beDenom = 0, cumMoney = 0;
+  const seriesWins = [], seriesWR = [];
+  const seriesPBA_raw = [], seriesPBA_roll = [];
+  const seriesAB = [], seriesSR_raw = [], seriesSR_roll = [];
+  const seriesBE = [], seriesNetMoney = [];
 
   sorted.forEach((g, i) => {
-    const isOnTeam = true; // already filtered to player's games
-    const onBidTeam = (g.bidTeam==='A' ? g.teamA : g.teamB)||[];
-    const didWinGame = (() => {
-      if (g.kamikaze) return g.kamOutcome === 'made' ? onBidTeam.includes(player) : !onBidTeam.includes(player);
-      return g.madeIt ? onBidTeam.includes(player) : !onBidTeam.includes(player);
-    })();
-    if (didWinGame) wins++;
+    const w = didWin(g, player) ? 1 : 0;
+    wins += w;
+    seriesWins.push(w);
     seriesWR.push(wins / (i + 1));
 
     const playerBid = g.bidder === player && !g.kamikaze;
     if (playerBid) {
       bids++;
       bidSum += g.bid;
-      if (g.madeIt) bidsMade++;
-      if (!g.madeIt) sets++;
+      if (g.madeIt) { bidsMade++; beNum += Math.max(0, (g.bidHands||0) - 6); }
+      else sets++;
+      beDenom += g.bid;
+      bidOutcomes.push(g.madeIt ? 1 : 0);
     }
-    seriesPBA.push(bids > 0 ? bidsMade / bids : null);
+
+    seriesPBA_raw.push(bids > 0 ? bidsMade / bids : null);
     seriesAB.push(bids > 0 ? bidSum / bids : null);
-    seriesSR.push(bids > 0 ? sets / bids : null);
-    seriesBR.push(bids / (i + 1));
+    seriesSR_raw.push(bids > 0 ? sets / bids : null);
+    seriesBE.push(bids >= 5 && beDenom > 0 ? beNum / beDenom : null);
+
+    const recentBids = bidOutcomes.slice(Math.max(0, bids - 10), bids);
+    const rollMadeRate = bids >= 3 ? recentBids.reduce((a,b)=>a+b,0) / recentBids.length : null;
+    seriesPBA_roll.push(rollMadeRate);
+    seriesSR_roll.push(rollMadeRate !== null ? 1 - rollMadeRate : null);
+
+    cumMoney += (g.delta?.[player] || 0);
+    seriesNetMoney.push(cumMoney);
   });
 
-  // Config for each metric
-  const metrics = {
-    winrate: { label: 'Win Rate', series: seriesWR, color: 'var(--teal)', fmt: v => `${Math.round(v*100)}%`, yMin: 0, yMax: 1, fmtY: v => `${Math.round(v*100)}%` },
-    pba:     { label: 'Bid %',    series: seriesPBA, color: 'var(--gold)', fmt: v => v===null?'—':`${Math.round(v*100)}%`, yMin: 0, yMax: 1, fmtY: v => `${Math.round(v*100)}%` },
-    avgbid:  { label: 'Avg Bid',  series: seriesAB,  color: '#a78bfa', fmt: v => v===null?'—':v.toFixed(2), yMin: 1, yMax: 7, fmtY: v => v.toFixed(1) },
-    setrate: { label: 'Set Rate', series: seriesSR,  color: 'var(--red-bright)', fmt: v => v===null?'—':`${Math.round(v*100)}%`, yMin: 0, yMax: 1, fmtY: v => `${Math.round(v*100)}%` },
-    bidrate: { label: 'Bid Rate', series: seriesBR,  color: '#60a5fa', fmt: v => `${Math.round(v*100)}%`, yMin: 0, yMax: 1, fmtY: v => `${Math.round(v*100)}%` },
+  const seriesWR_roll = rollingAvg(seriesWins, 10);
+
+  // WARP per-game marginals
+  const seriesWARPMargin = sorted.map(g => {
+    const myTeam = (g.teamA||[]).includes(player) ? (g.teamA||[]) : (g.teamB||[]);
+    const partner = myTeam.find(q => q !== player);
+    if (!partner) return null;
+    const withoutP = allGames.filter(g2 =>
+      ((g2.teamA||[]).includes(partner) || (g2.teamB||[]).includes(partner)) &&
+      !((g2.teamA||[]).includes(player) || (g2.teamB||[]).includes(player))
+    );
+    const baseWR = withoutP.length >= 5
+      ? withoutP.filter(g2 => didWin(g2, partner)).length / withoutP.length
+      : 0.50;
+    return (didWin(g, player) ? 1 : 0) - baseWR;
+  });
+
+  let warpSum = 0, warpCount = 0;
+  const seriesWARP_raw = seriesWARPMargin.map(v => {
+    if (v === null) return null;
+    warpSum += v; warpCount++;
+    return (warpSum / warpCount) * 100;
+  });
+  const seriesWARP_roll = rollingAvg(seriesWARPMargin, 10).map(v => v === null ? null : v * 100);
+
+  // Net Money multi-player overlay
+  const allActiveSet = new Set();
+  sorted.forEach(g => { (g.teamA||[]).forEach(p=>allActiveSet.add(p)); (g.teamB||[]).forEach(p=>allActiveSet.add(p)); });
+  const allActivePlayers = [...allActiveSet];
+  const PCOLORS = ['var(--teal)','#a78bfa','#fb923c','#f472b6','#4ade80','#60a5fa'];
+  const playerColorMap = {};
+  playerColorMap[player] = 'var(--gold)';
+  let ci = 0;
+  allActivePlayers.filter(p => p !== player).forEach(p => { playerColorMap[p] = PCOLORS[ci++ % PCOLORS.length]; });
+
+  const netMoneyByPlayer = {};
+  allActivePlayers.forEach(p => {
+    let cum = 0;
+    netMoneyByPlayer[p] = sorted.map(g => { cum += (g.delta?.[p] || 0); return cum; });
+  });
+
+  // H2H opponent series
+  const opponents = allActivePlayers.filter(p => p !== player);
+  const h2hOpp = _trendH2hOpponent && opponents.includes(_trendH2hOpponent) ? _trendH2hOpponent : (opponents[0]||null);
+  const seriesH2H = [];
+  let h2hWins = 0, h2hCount = 0;
+  sorted.forEach(g => {
+    const oppTeam = (g.teamA||[]).includes(player) ? (g.teamB||[]) : (g.teamA||[]);
+    if (h2hOpp && oppTeam.includes(h2hOpp)) {
+      h2hCount++;
+      if (didWin(g, player)) h2hWins++;
+      seriesH2H.push(h2hWins / h2hCount);
+    }
+  });
+
+  // Session boundary annotations (for net money chart)
+  const sessionEnds = [];
+  (S.allSessions||[]).forEach(sess => {
+    if (!sess.endedAt) return;
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if ((sorted[i].ts||0) <= sess.endedAt) { sessionEnds.push(i); break; }
+    }
+  });
+
+  // ── Metric definitions ────────────────────────────
+  const METRICS = {
+    winrate:  { label:'Win Rate',  color:'var(--teal)',       rolling:true,  rawSeries:seriesWR,       rollSeries:seriesWR_roll,  fmt:v=>v===null?'—':`${Math.round(v*100)}%`,          fmtY:v=>`${Math.round(v*100)}%`,   yMin:0, yMax:1   },
+    netmoney: { label:'Net $',     color:'var(--gold)',        rolling:false, rawSeries:seriesNetMoney,                            fmt:v=>v===null?'—':`$${v>=0?'+':''}${v.toFixed(0)}`, fmtY:v=>`$${v.toFixed(0)}`,        multi:true       },
+    pba:      { label:'Bid %',     color:'#a78bfa',            rolling:true,  rawSeries:seriesPBA_raw,  rollSeries:seriesPBA_roll, fmt:v=>v===null?'—':`${Math.round(v*100)}%`,          fmtY:v=>`${Math.round(v*100)}%`,   yMin:0, yMax:1   },
+    avgbid:   { label:'Avg Bid',   color:'#60a5fa',            rolling:false, rawSeries:seriesAB,                                  fmt:v=>v===null?'—':v.toFixed(2),                     fmtY:v=>v.toFixed(1),              yMin:1, yMax:7   },
+    setrate:  { label:'Set Rate',  color:'var(--red-bright)',  rolling:true,  rawSeries:seriesSR_raw,   rollSeries:seriesSR_roll,  fmt:v=>v===null?'—':`${Math.round(v*100)}%`,          fmtY:v=>`${Math.round(v*100)}%`,   yMin:0, yMax:1   },
+    bookeff:  { label:'Book Eff',  color:'#fb923c',            rolling:false, rawSeries:seriesBE,                                  fmt:v=>v===null?'—':v.toFixed(2),                     fmtY:v=>v.toFixed(1),              yMin:0, yMax:1.2 },
+    warp:     { label:'WARP',      color:'#f472b6',            rolling:true,  rawSeries:seriesWARP_raw, rollSeries:seriesWARP_roll,fmt:v=>v===null?'—':`${v>=0?'+':''}${v.toFixed(1)}`,  fmtY:v=>`${v>=0?'+':''}${v.toFixed(0)}`          },
+    h2h:      { label:'H2H W%',    color:'#4ade80',            rolling:false, rawSeries:seriesH2H,                                 fmt:v=>v===null?'—':`${Math.round(v*100)}%`,          fmtY:v=>`${Math.round(v*100)}%`,   yMin:0, yMax:1   },
   };
 
-  const mc = metrics[_trendMetric];
-  // Strip nulls for the main chart (for pba/avgbid/setrate which only update on bid games)
-  const chartData = mc.series.filter(v => v !== null);
-  const G = sorted.length;
+  const mc = METRICS[_trendMetric] || METRICS.winrate;
+  const useRolling = mc.rolling && _trendWindow === 'rolling';
+  const activeSeries = useRolling ? mc.rollSeries : mc.rawSeries;
 
-  // Picker HTML
-  let pickerHtml = '<div class="trend-metric-picker">';
-  Object.entries(metrics).forEach(([key, cfg]) => {
-    pickerHtml += `<button class="trend-metric-btn${_trendMetric===key?' active':''}" onclick="selectTrendMetric('${key}')">${cfg.label}</button>`;
+  // ── HTML build ────────────────────────────────────
+  let html = '';
+
+  // Metric picker
+  html += '<div class="trend-metric-picker">';
+  Object.entries(METRICS).forEach(([key, cfg]) => {
+    html += `<button class="trend-metric-btn${_trendMetric===key?' active':''}" onclick="selectTrendMetric('${key}')">${cfg.label}</button>`;
   });
-  pickerHtml += '</div>';
+  html += '</div>';
 
-  // Main chart
-  const noData = chartData.length < 2;
-  let chartHtml = '';
-  if (noData) {
-    chartHtml = `<div style="padding:24px;text-align:center;color:var(--cream-dim);font-size:12px">Need more games to show trend</div>`;
-  } else {
-    const yMin = _trendMetric === 'avgbid' ? 1 : 0;
-    const yMax = _trendMetric === 'avgbid' ? 7 : 1;
-    chartHtml = `<div class="trend-chart-wrap">${makeTrendSVG(chartData, yMin, yMax, mc.color, mc.fmtY)}</div>`;
+  // Rolling / Cumulative toggle (only for rolling-capable metrics)
+  if (mc.rolling) {
+    html += `<div class="trend-window-row">
+      <button class="trend-win-btn${_trendWindow==='raw'?' active':''}" onclick="selectTrendWindow('raw')">Cumulative</button>
+      <button class="trend-win-btn${_trendWindow==='rolling'?' active':''}" onclick="selectTrendWindow('rolling')">Rolling 10</button>
+    </div>`;
   }
 
-  // Current value callout
-  const lastValid = mc.series.filter(v => v !== null);
-  const curVal = lastValid.length ? mc.fmt(lastValid[lastValid.length - 1]) : '—';
-  const firstVal = lastValid.length ? mc.fmt(lastValid[0]) : '—';
+  // H2H opponent picker
+  if (_trendMetric === 'h2h' && opponents.length > 1) {
+    html += `<div class="trend-window-row">`;
+    opponents.forEach(opp => {
+      html += `<button class="trend-win-btn${h2hOpp===opp?' active':''}" onclick="selectH2hOpponent('${opp}')">${opp}</button>`;
+    });
+    html += `</div>`;
+  }
 
-  // Trend arrow: compare first half avg vs second half avg
+  // Chart
+  let chartHtml = '';
+  if (_trendMetric === 'netmoney') {
+    const allNetVals = allActivePlayers.flatMap(p => netMoneyByPlayer[p]);
+    const nmMin = allNetVals.length ? Math.min(...allNetVals) : -50;
+    const nmMax = allNetVals.length ? Math.max(...allNetVals) : 50;
+    const nmPad = Math.max((nmMax - nmMin) * 0.1, 10);
+    const allNetSeries = allActivePlayers.map(p => ({
+      data: netMoneyByPlayer[p], color: playerColorMap[p], label: p, highlight: p === player
+    }));
+    chartHtml = `<div class="trend-chart-wrap">
+      ${makeMultiLineSVG(allNetSeries, nmMin - nmPad, nmMax + nmPad, v => `$${v.toFixed(0)}`, sessionEnds)}
+      <div class="trend-legend">${allActivePlayers.map(p => `<span class="trend-legend-dot" style="background:${playerColorMap[p]}"></span><span class="trend-legend-name${p===player?' bold':''}">${p}</span>`).join('')}</div>
+    </div>`;
+  } else if (_trendMetric === 'h2h') {
+    if (seriesH2H.length < 2) {
+      chartHtml = `<div style="padding:20px 16px;color:var(--cream-dim);font-size:12px;text-align:center">Need more H2H matchups vs ${h2hOpp||'opponent'}</div>`;
+    } else {
+      chartHtml = `<div class="trend-chart-wrap">${makeTrendSVG(seriesH2H, 0, 1, mc.color, mc.fmtY)}</div>`;
+    }
+  } else {
+    const chartData = (activeSeries||[]).filter(v => v !== null);
+    if (chartData.length < 2) {
+      chartHtml = `<div style="padding:20px 16px;color:var(--cream-dim);font-size:12px;text-align:center">Not enough data for this metric yet</div>`;
+    } else {
+      let yMin = mc.yMin !== undefined ? mc.yMin : Math.min(...chartData) * 0.95;
+      let yMax = mc.yMax !== undefined ? mc.yMax : Math.max(...chartData) * 1.05;
+      if (_trendMetric === 'warp') {
+        const ext = Math.max(Math.abs(Math.min(...chartData)), Math.abs(Math.max(...chartData)));
+        yMin = -Math.max(ext * 1.2, 5); yMax = Math.max(ext * 1.2, 5);
+      }
+      chartHtml = `<div class="trend-chart-wrap">${makeTrendSVG(chartData, yMin, yMax, mc.color, mc.fmtY)}</div>`;
+    }
+  }
+
+  html += chartHtml;
+
+  // Stats block
+  const lastValid = (activeSeries||[]).filter(v => v !== null);
+  const curVal  = lastValid.length ? mc.fmt(lastValid[lastValid.length-1]) : '—';
+  const firstVal = lastValid.length ? mc.fmt(lastValid[0]) : '—';
   let trendArrow = '';
   if (lastValid.length >= 4) {
     const mid = Math.floor(lastValid.length / 2);
@@ -3965,40 +4215,46 @@ function renderInsightsTrend(player, games) {
     const secondHalf = lastValid.slice(mid).reduce((a,b)=>a+b,0)/(lastValid.length-mid);
     const diff = secondHalf - firstHalf;
     const improving = _trendMetric === 'setrate' ? diff < 0 : diff > 0;
-    const neutral = Math.abs(diff) < 0.02;
+    const neutral = Math.abs(diff) < (Math.abs(firstHalf||0) * 0.05 + 0.01);
     trendArrow = neutral ? '<span style="color:var(--cream-dim)">→ Stable</span>'
       : improving ? '<span style="color:var(--teal)">↑ Improving</span>'
       : '<span style="color:var(--red-bright)">↓ Declining</span>';
   }
 
-  // Mini sparkline summary row
-  const allMetricKeys = ['winrate','pba','avgbid','setrate','bidrate'];
-  const sparkCells = allMetricKeys.map(key => {
-    const mc2 = metrics[key];
-    const sd = mc2.series.filter(v => v !== null);
-    const cur = sd.length ? mc2.fmt(sd[sd.length-1]) : '—';
+  html += `<div class="trend-section">`;
+  html += `<div class="trend-section-title">${mc.label} · ${sorted.length} games</div>`;
+  if (_trendMetric === 'h2h') {
+    html += `<div class="trend-stat-row"><span class="trend-stat-label">vs ${h2hOpp||'—'}</span><span class="trend-stat-val">${h2hCount > 0 ? Math.round(h2hWins/h2hCount*100)+'% ('+h2hCount+'g)' : '—'}</span></div>`;
+  } else if (_trendMetric === 'netmoney') {
+    allActivePlayers.forEach(p => {
+      const pVals = netMoneyByPlayer[p];
+      const pCur = pVals.length ? pVals[pVals.length-1] : 0;
+      html += `<div class="trend-stat-row"><span class="trend-stat-label" style="color:${playerColorMap[p]}">${p}${p===player?' (you)':''}</span><span class="trend-stat-val">$${pCur>=0?'+':''}${pCur.toFixed(0)}</span></div>`;
+    });
+  } else {
+    html += `<div class="trend-stat-row"><span class="trend-stat-label">Current</span><span class="trend-stat-val">${curVal}</span></div>`;
+    html += `<div class="trend-stat-row"><span class="trend-stat-label">First game</span><span class="trend-stat-val">${firstVal}</span></div>`;
+    if (trendArrow) html += `<div class="trend-stat-row"><span class="trend-stat-label">Trajectory</span><span class="trend-stat-val">${trendArrow}</span></div>`;
+  }
+  html += `</div>`;
+
+  // All metrics sparkrow
+  html += `<div class="trend-section"><div class="trend-section-title">All metrics</div><div class="trend-sparkrow">`;
+  Object.entries(METRICS).forEach(([key, mc2]) => {
+    let sd;
+    if (key === 'netmoney') sd = seriesNetMoney.filter(v=>v!==null);
+    else if (key === 'h2h')  sd = seriesH2H;
+    else if (key === 'warp') sd = seriesWARP_roll.filter(v=>v!==null);
+    else sd = (mc2.rawSeries||[]).filter(v=>v!==null);
+    const cur   = sd.length ? mc2.fmt(sd[sd.length-1]) : '—';
     const spark = sd.length >= 2 ? makeSparkSVG(sd, mc2.color) : '';
-    return `<div class="trend-spark-cell" onclick="selectTrendMetric('${key}')" style="cursor:pointer${_trendMetric===key?';border-color:var(--gold)':''}">
+    html += `<div class="trend-spark-cell" onclick="selectTrendMetric('${key}')" style="cursor:pointer${_trendMetric===key?';border-color:var(--gold)':''}">
       <div class="trend-spark-label">${mc2.label}</div>
       <div class="trend-spark-val">${cur}</div>
       ${spark}
     </div>`;
   });
-
-  // Summary stats
-  const finalWR = seriesWR.length ? seriesWR[seriesWR.length-1] : null;
-  const finalPBA = seriesPBA.filter(v=>v!==null);
-  const finalAB = seriesAB.filter(v=>v!==null);
-
-  let html = pickerHtml + chartHtml;
-  html += `<div class="trend-section">`;
-  html += `<div class="trend-section-title">${mc.label} · ${G} games</div>`;
-  html += `<div class="trend-stat-row"><span class="trend-stat-label">Current value</span><span class="trend-stat-val">${curVal}</span></div>`;
-  html += `<div class="trend-stat-row"><span class="trend-stat-label">First game</span><span class="trend-stat-val">${firstVal}</span></div>`;
-  if (trendArrow) html += `<div class="trend-stat-row"><span class="trend-stat-label">Trajectory</span><span class="trend-stat-val">${trendArrow}</span></div>`;
-  html += `<div class="trend-section-title" style="margin-top:20px">All metrics at a glance</div>`;
-  html += `<div class="trend-sparkrow">${sparkCells.join('')}</div>`;
-  html += `</div>`;
+  html += `</div></div>`;
 
   body.innerHTML = html;
 }
