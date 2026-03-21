@@ -1,0 +1,1876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bid Whist</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --felt: #1a2e1f;
+  --felt-light: #223328;
+  --felt-lighter: #2a3d2f;
+  --gold: #c9a84c;
+  --gold-dim: #8a6e2e;
+  --gold-pale: #f0d98a;
+  --teal: #2eb8a0;
+  --teal-dim: #1a7a6a;
+  --teal-pale: #8fe8d8;
+  --teal-bg: rgba(46,184,160,0.12);
+  --teal-border: rgba(46,184,160,0.4);
+  --cream: #f5f0e8;
+  --cream-dim: #c8c2b4;
+  --cream-faint: rgba(245,240,232,0.07);
+  --red: #c0392b;
+  --red-bright: #e74c3c;
+  --red-bg: rgba(192,57,43,0.15);
+  --green-bright: #27ae60;
+  --green-bg: rgba(39,174,96,0.15);
+  --amber: #e0a020;
+  --amber-bg: rgba(224,160,32,0.12);
+  --border: rgba(201,168,76,0.2);
+  --border-strong: rgba(201,168,76,0.45);
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --radius: 12px;
+  --radius-sm: 7px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--felt);
+  color: var(--cream);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  min-height: 100vh;
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(201,168,76,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 100%, rgba(39,174,96,0.04) 0%, transparent 60%);
+}
+
+/* ── Layout ── */
+.app { max-width: 680px; margin: 0 auto; padding: 0 0 100px; }
+
+/* ── Header ── */
+.header {
+  padding: 20px 20px 0;
+  display: flex; align-items: flex-start; justify-content: space-between;
+}
+.header-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 26px;
+  color: var(--gold);
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+.header-sub {
+  font-size: 11px;
+  color: var(--cream-dim);
+  margin-top: 4px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.05em;
+}
+.btn-ghost {
+  background: none;
+  border: 1px solid var(--border-strong);
+  color: var(--gold);
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  transition: all 0.15s;
+}
+.btn-ghost:hover { background: var(--cream-faint); }
+
+/* ── Nav ── */
+.nav {
+  display: flex; gap: 0;
+  margin: 20px 20px 0;
+  border-bottom: 1px solid var(--border);
+}
+.nav-btn {
+  background: none; border: none;
+  color: var(--cream-dim);
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 8px 16px 10px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.15s;
+}
+.nav-btn:hover { color: var(--cream); }
+.nav-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+/* ── Views ── */
+.view { display: none; padding: 20px; }
+.view.active { display: block; }
+
+/* ── Cards ── */
+.card {
+  background: var(--felt-light);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+.card-title {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--gold-dim);
+  margin-bottom: 12px;
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── Score Panel ── */
+.score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.score-panel {
+  background: var(--felt-lighter);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  position: relative;
+  transition: border-color 0.2s, background 0.2s;
+}
+/* Team A = gold theme, Team B = teal theme */
+.score-panel.team-a { border-color: rgba(201,168,76,0.35); }
+.score-panel.team-b { border-color: rgba(46,184,160,0.25); }
+.score-panel.team-a .score-big { color: var(--gold-pale); }
+.score-panel.team-b .score-big { color: var(--teal-pale); }
+.score-panel.team-a .score-team-label { color: var(--gold-dim); }
+.score-panel.team-b .score-team-label { color: var(--teal-dim); }
+.score-panel.blitz {
+  border-color: var(--red);
+  background: var(--red-bg);
+}
+.score-panel.winner {
+  border-color: var(--gold);
+  background: var(--amber-bg);
+}
+/* Flash animation for rotation change */
+@keyframes rotFlash {
+  0% { opacity: 1; }
+  30% { opacity: 0.3; }
+  60% { opacity: 1; }
+  80% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+.rot-flash { animation: rotFlash 0.6s ease; }
+
+.score-team-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gold-dim);
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 4px;
+}
+.score-names {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cream);
+  margin-bottom: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.score-big {
+  font-family: 'Playfair Display', serif;
+  font-size: 42px;
+  line-height: 1;
+  color: var(--gold-pale);
+}
+.score-big.blitz-num { color: var(--red-bright); }
+
+/* Progress bar under score */
+.score-bar-wrap {
+  margin-top: 8px;
+  height: 4px;
+  background: var(--cream-faint);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.score-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+.team-a .score-bar-fill { background: var(--gold); }
+.team-b .score-bar-fill { background: var(--teal); }
+.score-panel.blitz .score-bar-fill { background: var(--red-bright); }
+
+.score-target {
+  font-size: 11px;
+  color: var(--cream-dim);
+  margin-top: 4px;
+}
+.score-pips {
+  display: flex; gap: 3px; flex-wrap: wrap;
+  margin-top: 8px;
+}
+.pip {
+  width: 13px; height: 13px;
+  border-radius: 3px;
+  background: var(--cream-faint);
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+}
+.pip.on-a { background: var(--gold); border-color: var(--gold); }
+.pip.on-b { background: var(--teal); border-color: var(--teal); }
+.pip.neg { background: var(--red); border-color: var(--red); }
+.blitz-tag {
+  display: inline-block;
+  background: var(--red);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 20px;
+  margin-top: 6px;
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── Money Table ── */
+.money-row {
+  display: flex; align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+}
+.money-row:last-child { border-bottom: none; }
+.money-rank {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--gold-dim);
+  width: 18px;
+  text-align: center;
+}
+.money-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+}
+.money-amt {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  min-width: 70px;
+  text-align: right;
+}
+.money-amt.pos { color: var(--green-bright); }
+.money-amt.neg { color: var(--red-bright); }
+.money-amt.zero { color: var(--cream-dim); }
+.money-stats {
+  display: flex; gap: 8px;
+  font-size: 11px;
+  color: var(--cream-dim);
+  font-family: 'DM Mono', monospace;
+}
+.money-stat { white-space: nowrap; }
+
+/* Money progress bar */
+.money-progress-wrap {
+  height: 3px;
+  background: var(--cream-faint);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 4px;
+  width: 100%;
+}
+.money-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+.money-progress-fill.pos { background: var(--green-bright); }
+.money-progress-fill.neg { background: var(--red-bright); }
+
+/* ── Step label with completion state ── */
+.log-step {
+  margin-bottom: 16px;
+}
+.log-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gold-dim);
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 6px;
+  transition: color 0.2s;
+}
+.log-label .step-done {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: var(--felt);
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.log-label.done { color: var(--gold); }
+.log-label.done .step-done { opacity: 1; transform: scale(1); }
+
+/* Team toggle */
+.team-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.team-btn {
+  background: var(--felt-lighter);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--cream-dim);
+  padding: 14px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  text-align: left;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.team-btn:hover { border-color: var(--border-strong); color: var(--cream); }
+/* Team A = gold when selected */
+.team-btn.sel-a {
+  border-color: var(--gold);
+  background: rgba(201,168,76,0.1);
+  color: var(--gold-pale);
+}
+/* Team B = teal when selected */
+.team-btn.sel-b {
+  border-color: var(--teal);
+  background: var(--teal-bg);
+  color: var(--teal-pale);
+}
+.team-btn-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); font-family: 'DM Mono', monospace; margin-bottom: 3px; }
+.team-btn-label.b { color: var(--teal-dim); }
+.team-btn-names { font-size: 13px; font-weight: 500; }
+
+/* Player selector */
+.player-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+.player-empty-hint {
+  font-size: 13px;
+  color: var(--cream-dim);
+  font-style: italic;
+  padding: 4px 2px;
+}
+.player-btn {
+  background: var(--felt-lighter);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--cream-dim);
+  padding: 10px 20px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.player-btn:hover { border-color: var(--border-strong); color: var(--cream); }
+.player-btn.sel-a {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--felt);
+  font-weight: 500;
+}
+.player-btn.sel-b {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: var(--felt);
+  font-weight: 500;
+}
+
+/* Bid selector */
+.bid-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.bid-btn {
+  background: var(--felt-lighter);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--cream-dim);
+  padding: 14px 4px;
+  cursor: pointer;
+  font-size: 18px;
+  font-family: 'Playfair Display', serif;
+  text-align: center;
+  transition: all 0.12s;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.bid-btn:hover { border-color: var(--border-strong); color: var(--cream); }
+.bid-btn.sel-a {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--felt);
+}
+.bid-btn.sel-b {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: var(--felt);
+}
+.bid-btn .bid-tag {
+  display: block;
+  font-size: 8px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+  opacity: 0.7;
+  text-transform: uppercase;
+}
+/* Tooltip for Cam/Bos */
+.bid-btn[data-tip] { position: relative; }
+.bid-btn[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a1a;
+  color: var(--cream);
+  font-size: 10px;
+  font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 5px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 10;
+  border: 1px solid var(--border);
+}
+.bid-btn[data-tip]:hover::after { opacity: 1; }
+
+/* Hands input */
+/* Hands zone layout */
+.hands-zones {
+  display: flex;
+  gap: 0;
+  margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.hands-zone {
+  flex: 1;
+}
+.hands-zone-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: 'DM Mono', monospace;
+  padding: 5px 8px 4px;
+  display: block;
+  border-bottom: 1px solid var(--border);
+}
+.hands-zone.set-zone .hands-zone-label {
+  background: rgba(192,57,43,0.12);
+  color: var(--red-bright);
+  border-right: 1px solid var(--border);
+}
+.hands-zone.made-zone .hands-zone-label {
+  background: rgba(39,174,96,0.08);
+  color: var(--green-bright);
+}
+.hands-zone-btns {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+}
+.hands-btn {
+  background: var(--felt-lighter);
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--cream-dim);
+  padding: 12px 4px;
+  cursor: pointer;
+  font-size: 16px;
+  font-family: 'Playfair Display', serif;
+  text-align: center;
+  transition: all 0.12s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.hands-btn:last-child { border-right: none; }
+.made-zone .hands-btn:last-child { border-right: none; }
+
+/* Bid-aware coloring — losing range */
+.hands-btn.bid-loss {
+  color: var(--red-bright);
+  background: rgba(192,57,43,0.1);
+}
+.hands-btn.bid-win {
+  color: var(--green-bright);
+  background: rgba(39,174,96,0.06);
+}
+
+/* Selected states */
+.hands-btn.sel-a {
+  background: var(--gold) !important;
+  border-color: var(--gold);
+  color: var(--felt) !important;
+  font-weight: 700;
+}
+.hands-btn.sel-b {
+  background: var(--teal) !important;
+  border-color: var(--teal);
+  color: var(--felt) !important;
+  font-weight: 700;
+}
+
+.hands-summary {
+  font-size: 12px;
+  color: var(--cream-dim);
+  font-family: 'DM Mono', monospace;
+  min-height: 18px;
+  padding: 0 2px;
+}
+
+/* Preview */
+.preview {
+  background: var(--felt-lighter);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--cream-dim);
+  min-height: 48px;
+}
+.preview .made { color: var(--green-bright); font-weight: 500; }
+.preview .set { color: var(--red-bright); font-weight: 500; }
+.preview .gold { color: var(--gold); font-weight: 500; }
+.preview .warn { color: var(--amber); }
+
+/* Special outcomes */
+.specials-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.special-chip {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--felt-lighter);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--cream-dim);
+  cursor: default;
+  font-family: 'DM Sans', sans-serif;
+}
+.special-chip.on {
+  border-color: var(--gold);
+  color: var(--gold-pale);
+  background: rgba(201,168,76,0.1);
+}
+.special-chip.red-chip.on {
+  border-color: var(--red-bright);
+  color: var(--red-bright);
+  background: var(--red-bg);
+}
+.special-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* Kamikaze section */
+.kam-panel {
+  background: var(--red-bg);
+  border: 1px solid var(--red);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+.kam-panel .log-label { color: #e07070; }
+.kam-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.kam-toggle input { display: none; }
+.kam-switch {
+  width: 36px; height: 20px;
+  background: var(--felt-lighter);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  position: relative;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.kam-switch::after {
+  content: '';
+  position: absolute;
+  width: 14px; height: 14px;
+  background: var(--cream-dim);
+  border-radius: 50%;
+  top: 2px; left: 2px;
+  transition: all 0.2s;
+}
+.kam-toggle.on .kam-switch { background: var(--red); border-color: var(--red); }
+.kam-toggle.on .kam-switch::after { transform: translateX(16px); background: #fff; }
+.kam-toggle-label { font-size: 13px; font-weight: 500; color: var(--cream-dim); }
+.kam-toggle.on .kam-toggle-label { color: var(--red-bright); }
+
+.kam-opts { margin-top: 12px; display: none; }
+.kam-opts.show { display: block; }
+.kam-outcome-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.outcome-btn {
+  background: var(--felt-lighter);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--cream-dim);
+  padding: 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  text-align: center;
+  transition: all 0.15s;
+}
+.outcome-btn.sel-made { border-color: var(--green-bright); background: var(--green-bg); color: var(--green-bright); }
+.outcome-btn.sel-set { border-color: var(--red-bright); background: var(--red-bg); color: var(--red-bright); }
+
+/* ── Sticky submit button ── */
+.sticky-log-wrap {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex; justify-content: center;
+  padding: 12px 20px 20px;
+  background: linear-gradient(transparent, rgba(26,46,31,0.98) 35%);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.sticky-log-wrap.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
+}
+.btn-log-sticky {
+  max-width: 640px;
+  width: 100%;
+  background: var(--gold);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--felt);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  font-size: 15px;
+  padding: 14px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background 0.15s;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+.btn-log-sticky:hover { background: var(--gold-pale); }
+
+/* Inline submit (hidden when sticky shows, kept for no-JS fallback) */
+.btn-submit {
+  width: 100%;
+  background: var(--gold);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--felt);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  font-size: 15px;
+  padding: 14px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: all 0.15s;
+  margin-top: 16px;
+}
+.btn-submit:hover { background: var(--gold-pale); }
+.btn-submit:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Games log table */
+.games-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.games-table th {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gold-dim);
+  font-family: 'DM Mono', monospace;
+  text-align: left;
+  padding: 0 8px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.games-table td {
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--cream-dim);
+  vertical-align: middle;
+}
+.games-table tr:last-child td { border-bottom: none; }
+.games-table tr:hover td { background: var(--cream-faint); }
+.games-table .em { color: var(--cream); font-weight: 500; }
+/* Hide hands column on very small screens */
+@media (max-width: 400px) { .col-hands { display: none; } }
+.badge {
+  display: inline-block;
+  font-size: 9px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 20px;
+  margin: 1px;
+}
+.badge.bos { background: rgba(39,174,96,0.2); color: var(--green-bright); border: 1px solid rgba(39,174,96,0.3); }
+.badge.cam { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(224,160,32,0.3); }
+.badge.set { background: var(--red-bg); color: var(--red-bright); border: 1px solid rgba(192,57,43,0.3); }
+.badge.kam { background: rgba(180,60,60,0.2); color: #e07070; border: 1px solid rgba(180,60,60,0.4); }
+.badge.blz { background: rgba(180,80,220,0.15); color: #c080e0; border: 1px solid rgba(180,80,220,0.3); }
+
+/* Card header row with action button */
+.card-title-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.card-title-row .card-title { margin-bottom: 0; }
+.btn-undo {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--cream-dim);
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+}
+.btn-undo:hover { border-color: var(--amber); color: var(--amber); }
+
+/* ── Setup ── */
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); font-family: 'DM Mono', monospace; margin-bottom: 6px; }
+.field input {
+  width: 100%;
+  background: var(--felt-lighter);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--cream);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.field input:focus { border-color: var(--gold); }
+.cfg-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.cfg-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.player-list-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.player-list-item:last-child { border-bottom: none; }
+.player-list-name { font-size: 14px; font-weight: 500; }
+.btn-rm {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--cream-dim);
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+}
+.btn-rm:hover { border-color: var(--red-bright); color: var(--red-bright); }
+.add-player-row { display: flex; gap: 8px; margin-top: 10px; }
+.add-player-row input { flex: 1; }
+.btn-add {
+  background: var(--felt-lighter);
+  border: 1px solid var(--border-strong);
+  color: var(--gold);
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.btn-add:hover { background: var(--cream-faint); }
+.btn-start {
+  width: 100%;
+  background: var(--gold);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--felt);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  font-size: 15px;
+  padding: 14px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: all 0.15s;
+}
+.btn-start:hover { background: var(--gold-pale); }
+.btn-danger {
+  width: 100%;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--cream-dim);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  padding: 10px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.15s;
+}
+.btn-danger:hover { border-color: var(--red-bright); color: var(--red-bright); }
+
+/* ── Stats ── */
+.stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+.stat-card {
+  background: var(--felt-lighter);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.stat-player {
+  font-family: 'Playfair Display', serif;
+  font-size: 16px;
+  color: var(--gold-pale);
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+.stat-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+.stat-key { font-size: 11px; color: var(--cream-dim); }
+.stat-val { font-size: 13px; font-weight: 500; font-family: 'DM Mono', monospace; }
+
+/* ── History ── */
+.history-session { margin-bottom: 20px; }
+.history-session-hdr {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gold-dim);
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Empty ── */
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--cream-dim);
+}
+.empty-icon { font-size: 36px; margin-bottom: 10px; }
+.empty-title { font-size: 15px; font-weight: 500; color: var(--cream); margin-bottom: 6px; }
+.empty-sub { font-size: 13px; }
+
+/* ── Session end banner ── */
+.session-banner {
+  background: linear-gradient(135deg, rgba(201,168,76,0.2), rgba(201,168,76,0.05));
+  border: 1px solid var(--gold);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  display: none;
+}
+.session-banner.show { display: block; }
+.session-banner-title { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--gold-pale); margin-bottom: 4px; }
+.session-banner-sub { font-size: 12px; color: var(--cream-dim); }
+
+/* ── Rotation info ── */
+.rotation-info {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--felt-lighter);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  font-size: 11px;
+  color: var(--cream-dim);
+  font-family: 'DM Mono', monospace;
+  transition: all 0.3s;
+}
+.rotation-info.flash {
+  border-color: var(--gold);
+  background: rgba(201,168,76,0.1);
+  color: var(--gold);
+}
+.rotation-info .rot-num { color: var(--gold); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div>
+      <div class="header-title">♠ Bid Whist</div>
+      <div class="header-sub" id="hdr-sub">No active session</div>
+    </div>
+    <button class="btn-ghost" onclick="nav('setup')">Setup</button>
+  </div>
+
+  <div class="nav">
+    <button class="nav-btn active" id="nav-play" onclick="nav('play')">Play</button>
+    <button class="nav-btn" id="nav-history" onclick="nav('history')">History</button>
+    <button class="nav-btn" id="nav-stats" onclick="nav('stats')">Stats</button>
+    <button class="nav-btn" id="nav-setup" onclick="nav('setup')">Setup</button>
+  </div>
+
+  <!-- ── PLAY ── -->
+  <div class="view active" id="view-play">
+
+    <div id="no-session-msg" class="empty">
+      <div class="empty-icon">♣</div>
+      <div class="empty-title">No active session</div>
+      <div class="empty-sub">Head to Setup to configure players and start a session.</div>
+      <button class="btn-ghost" style="margin-top:16px" onclick="nav('setup')">Go to setup →</button>
+    </div>
+
+    <div id="play-main" style="display:none">
+
+      <div class="session-banner" id="session-banner">
+        <div class="session-banner-title" id="session-banner-title">Session over!</div>
+        <div class="session-banner-sub" id="session-banner-sub"></div>
+      </div>
+
+      <div class="rotation-info" id="rotation-info">
+        <span>Rotation <span class="rot-num" id="rot-label"></span></span>
+        <span id="rot-teams-label"></span>
+      </div>
+
+      <!-- Score panels -->
+      <div class="score-grid" id="score-panels" style="margin-bottom:14px"></div>
+
+      <!-- Money -->
+      <div class="card">
+        <div class="card-title">Money standings</div>
+        <div id="money-rows"></div>
+      </div>
+
+      <!-- Log a game -->
+      <div class="card">
+        <div class="card-title">Log a game</div>
+
+        <!-- Step 1: Bid team -->
+        <div class="log-step">
+          <div class="log-label" id="lbl-step1">
+            <span class="step-done">✓</span>1 — Who won the bid?
+          </div>
+          <div class="team-toggle" id="team-toggle"></div>
+        </div>
+
+        <!-- Step 2: Bidder -->
+        <div class="log-step">
+          <div class="log-label" id="lbl-step2">
+            <span class="step-done">✓</span>2 — Which player bid?
+          </div>
+          <div class="player-grid" id="player-grid">
+            <span class="player-empty-hint">Select a team above first</span>
+          </div>
+        </div>
+
+        <!-- Step 3: Bid amount -->
+        <div class="log-step">
+          <div class="log-label" id="lbl-step3">
+            <span class="step-done">✓</span>3 — Bid amount
+          </div>
+          <div class="bid-grid" id="bid-grid"></div>
+        </div>
+
+        <!-- Step 4: Hands -->
+        <div class="log-step">
+          <div class="log-label" id="lbl-step4">
+            <span class="step-done">✓</span>4 — Hands won by bidding team
+          </div>
+          <div class="hands-zones" id="hands-zones">
+            <div class="hands-zone set-zone">
+              <span class="hands-zone-label">Set (0–6)</span>
+              <div class="hands-zone-btns" id="hands-set-btns"></div>
+            </div>
+            <div class="hands-zone made-zone">
+              <span class="hands-zone-label">Made (7–13)</span>
+              <div class="hands-zone-btns" id="hands-made-btns"></div>
+            </div>
+          </div>
+          <div class="hands-summary" id="hands-summary"></div>
+        </div>
+
+        <!-- Specials (auto-detected) -->
+        <div class="log-step">
+          <div class="log-label">Detected outcomes</div>
+          <div class="specials-row">
+            <div class="special-chip" id="chip-boston"><span class="special-dot"></span>Boston</div>
+            <div class="special-chip" id="chip-cambridge"><span class="special-dot"></span>Cambridge</div>
+            <div class="special-chip red-chip" id="chip-set"><span class="special-dot"></span>Set</div>
+            <div class="special-chip" id="chip-blitz"><span class="special-dot"></span>Blitz</div>
+          </div>
+        </div>
+
+        <!-- Kamikaze toggle -->
+        <div class="log-step">
+          <label class="kam-toggle" id="kam-toggle-label" onclick="toggleKam()">
+            <div class="kam-switch" id="kam-switch"></div>
+            <span class="kam-toggle-label">Kamikaze bid</span>
+          </label>
+          <div class="kam-opts" id="kam-opts">
+            <div class="kam-panel">
+              <div class="log-label">Kamikaze outcome</div>
+              <div class="kam-outcome-grid">
+                <button class="outcome-btn" id="kam-made" onclick="setKamOutcome('made')">Made it — 2× payout</button>
+                <button class="outcome-btn" id="kam-set" onclick="setKamOutcome('set')">Got set — 2× penalty</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Preview -->
+        <div class="log-step" style="margin-bottom:0">
+          <div class="log-label">Preview</div>
+          <div class="preview" id="preview">Select options above to see the result.</div>
+        </div>
+
+        <!-- Inline submit (spacer so content isn't hidden behind sticky) -->
+        <div style="height:60px"></div>
+      </div>
+
+      <!-- Games this session -->
+      <div class="card">
+        <div class="card-title-row">
+          <div class="card-title">Games this session (<span id="game-count">0</span>)</div>
+          <button class="btn-undo" id="btn-undo" onclick="undoLastGame()" style="display:none">↩ Undo last</button>
+        </div>
+        <div id="games-list"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── HISTORY ── -->
+  <div class="view" id="view-history">
+    <div id="history-content"><div class="empty"><div class="empty-icon">♦</div><div class="empty-title">No history yet</div></div></div>
+  </div>
+
+  <!-- ── STATS ── -->
+  <div class="view" id="view-stats">
+    <div id="stats-content"><div class="empty"><div class="empty-icon">♥</div><div class="empty-title">No stats yet</div></div></div>
+  </div>
+
+  <!-- ── SETUP ── -->
+  <div class="view" id="view-setup">
+    <div class="card">
+      <div class="card-title">Players &amp; Teams</div>
+      <div style="font-size:11px;color:var(--cream-dim);margin-bottom:10px">Positions 1–2 = <span style="color:var(--gold-dim)">Team A</span> · Positions 3–4 = <span style="color:var(--teal-dim)">Team B</span>. Use ↑↓ to reorder.</div>
+      <div id="player-list-setup"></div>
+      <div class="add-player-row">
+        <input class="field input" type="text" id="inp-new-player" placeholder="Player name" onkeydown="if(event.key==='Enter')addPlayer()">
+        <button class="btn-add" onclick="addPlayer()">Add</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Session rules</div>
+      <div class="cfg-grid" style="margin-bottom:12px">
+        <div class="field"><label>Points to win</label><input type="number" id="cfg-pts" value="9"></div>
+        <div class="field"><label>Money target ($)</label><input type="number" id="cfg-target" value="20"></div>
+        <div class="field"><label>Win payout ($)</label><input type="number" id="cfg-win" value="5"></div>
+      </div>
+      <div class="cfg-grid" style="margin-bottom:12px">
+        <div class="field"><label>Boston bonus ($)</label><input type="number" id="cfg-boston" value="3"></div>
+        <div class="field"><label>Cambridge bonus ($)</label><input type="number" id="cfg-cam" value="1"></div>
+        <div class="field"><label>Set penalty ($)</label><input type="number" id="cfg-set" value="2"></div>
+      </div>
+      <div class="cfg-grid">
+        <div class="field"><label>Blitz multiplier</label><input type="number" id="cfg-blitz" value="1.5" step="0.1"></div>
+        <div class="field"><label>Kamikaze win (×)</label><input type="number" id="cfg-kw" value="2" step="0.5"></div>
+        <div class="field"><label>Kamikaze loss (×)</label><input type="number" id="cfg-kl" value="2" step="0.5"></div>
+      </div>
+    </div>
+    <button class="btn-start" onclick="startSession()">▶ Start session</button>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn-danger" style="margin-top:0" onclick="exportData()">⬇ Export data</button>
+      <button class="btn-danger" style="margin-top:0" onclick="importData()">⬆ Import data</button>
+    </div>
+    <button class="btn-danger" onclick="resetAll()">Reset all data</button>
+  </div>
+
+</div>
+
+<!-- Sticky Log button -->
+<div class="sticky-log-wrap" id="sticky-log-wrap">
+  <button class="btn-log-sticky" onclick="logGame()">Log game</button>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────
+let S = {
+  players: ['Matt','Juan','Rohin','Jackson'],
+  cfg: { pts:9, target:20, win:5, boston:3, cam:1, set:2, blitz:1.5, kw:2, kl:2 },
+  session: null,
+  allSessions: []
+};
+
+function load() { try { const d=localStorage.getItem('whist4'); if(d) S=JSON.parse(d); } catch(e){} }
+function save() { localStorage.setItem('whist4', JSON.stringify(S)); }
+
+// form state
+let fBidTeam = null, fBidder = null, fBid = null, fHands = null, fKam = false, fKamOutcome = null;
+
+// ── Rotations ──────────────────────────────────────
+function getRots(ps) {
+  const p = ps.slice(0,4);
+  return [
+    [p[0],p[1],p[2],p[3]],
+    [p[0],p[2],p[1],p[3]],
+    [p[0],p[3],p[1],p[2]]
+  ];
+}
+function curRot() {
+  const rots = getRots(S.players);
+  return rots[S.session.rotationIdx % rots.length];
+}
+
+// ── Navigation ─────────────────────────────────────
+function nav(tab) {
+  ['play','history','stats','setup'].forEach(t => {
+    document.getElementById('view-'+t).classList.toggle('active', t===tab);
+    document.getElementById('nav-'+t).classList.toggle('active', t===tab);
+  });
+  if (tab==='history') renderHistory();
+  if (tab==='stats') renderStats();
+  if (tab==='play') renderPlay();
+  if (tab==='setup') renderSetup();
+}
+
+// ── Helpers ────────────────────────────────────────
+function teamSelClass(team) { return team==='A' ? 'sel-a' : 'sel-b'; }
+
+// ── Step label completion ──────────────────────────
+function markStep(id, done) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('done', done);
+}
+
+// ── Sticky button visibility ───────────────────────
+function updateStickyBtn(enabled) {
+  document.getElementById('sticky-log-wrap').classList.toggle('show', enabled);
+}
+
+// ── Form interactions ─────────────────────────────
+function setBidTeam(t) {
+  fBidTeam = t;
+  fBidder = null;
+  document.querySelectorAll('.team-btn').forEach(b => {
+    b.classList.remove('sel-a','sel-b');
+    if (b.dataset.team === t) b.classList.add(teamSelClass(t));
+  });
+  markStep('lbl-step1', true);
+  rebuildBidderGrid();
+  updatePreview();
+}
+
+function setBidder(p) {
+  fBidder = p;
+  document.querySelectorAll('.player-btn').forEach(b => {
+    b.classList.remove('sel-a','sel-b');
+    if (b.dataset.player === p) b.classList.add(teamSelClass(fBidTeam));
+  });
+  markStep('lbl-step2', true);
+  updatePreview();
+}
+
+function setBid(b) {
+  fBid = b;
+  document.querySelectorAll('.bid-btn').forEach(el => {
+    el.classList.remove('sel-a','sel-b');
+    if (parseInt(el.dataset.bid) === b) el.classList.add(teamSelClass(fBidTeam || 'A'));
+  });
+  markStep('lbl-step3', true);
+  renderHandsGrid();
+  updatePreview();
+}
+
+function setHands(h) {
+  fHands = h;
+  renderHandsGrid();
+  markStep('lbl-step4', true);
+  updatePreview();
+}
+
+function renderHandsGrid() {
+  // For bid N, need bidHands >= N + 6 to make it
+  // So hands 0 .. (N+5) are losses, hands (N+6) .. 13 are wins
+  const minMade = fBid !== null ? fBid + 6 : 7; // default threshold = 7 (bid 1)
+
+  const selClass = teamSelClass(fBidTeam || 'A');
+
+  function btnHtml(i) {
+    const isLoss = i < minMade;
+    let cls = '';
+    if (fHands === i) {
+      cls = selClass;
+    } else if (fBid !== null) {
+      cls = isLoss ? 'bid-loss' : 'bid-win';
+    }
+    return `<button class="hands-btn ${cls}" onclick="setHands(${i})" ontouchstart="">${i}</button>`;
+  }
+
+  const setContainer = document.getElementById('hands-set-btns');
+  const madeContainer = document.getElementById('hands-made-btns');
+  if (!setContainer || !madeContainer) return;
+
+  // Set zone: 0–6
+  setContainer.innerHTML = Array.from({length:7},(_,i) => btnHtml(i)).join('');
+  // Made zone: 7–13
+  madeContainer.innerHTML = Array.from({length:7},(_,i) => btnHtml(i+7)).join('');
+
+  // Update zone labels to reflect current bid threshold
+  if (fBid !== null) {
+    const setLabel = document.querySelector('.set-zone .hands-zone-label');
+    const madeLabel = document.querySelector('.made-zone .hands-zone-label');
+    if (setLabel) setLabel.textContent = `Set (need ${minMade}+)`;
+    if (madeLabel) madeLabel.textContent = `Made (${minMade}–13)`;
+  } else {
+    const setLabel = document.querySelector('.set-zone .hands-zone-label');
+    const madeLabel = document.querySelector('.made-zone .hands-zone-label');
+    if (setLabel) setLabel.textContent = 'Set (0–6)';
+    if (madeLabel) madeLabel.textContent = 'Made (7–13)';
+  }
+
+  const sumEl = document.getElementById('hands-summary');
+  if (sumEl && fHands !== null) {
+    const other = 13 - fHands;
+    const result = fBid !== null && fHands >= minMade ? '✓ Made' : fBid !== null ? '✗ Set' : '';
+    sumEl.textContent = `Bidding team: ${fHands} · Other team: ${other}${result ? '  ' + result : ''}`;
+  } else if (sumEl) {
+    sumEl.textContent = '';
+  }
+}
+
+function setHandsDefault() {
+  fHands = 7;
+}
+
+function toggleKam() {
+  fKam = !fKam;
+  fKamOutcome = null;
+  const lbl = document.getElementById('kam-toggle-label');
+  const opts = document.getElementById('kam-opts');
+  lbl.classList.toggle('on', fKam);
+  opts.classList.toggle('show', fKam);
+  document.getElementById('kam-made').className = 'outcome-btn';
+  document.getElementById('kam-set').className = 'outcome-btn';
+  updatePreview();
+}
+
+function setKamOutcome(o) {
+  fKamOutcome = o;
+  document.getElementById('kam-made').className = 'outcome-btn' + (o==='made'?' sel-made':'');
+  document.getElementById('kam-set').className = 'outcome-btn' + (o==='set'?' sel-set':'');
+  updatePreview();
+}
+
+function rebuildBidderGrid() {
+  const grid = document.getElementById('player-grid');
+  if (!fBidTeam) {
+    grid.innerHTML = '<span class="player-empty-hint">Select a team above first</span>';
+    return;
+  }
+  const rot = curRot();
+  const players = fBidTeam === 'A' ? [rot[0],rot[1]] : [rot[2],rot[3]];
+  const selClass = teamSelClass(fBidTeam);
+  grid.innerHTML = players.map(p =>
+    `<button class="player-btn${fBidder===p?' '+selClass:''}" data-player="${p}" onclick="setBidder('${p}')">${p}</button>`
+  ).join('');
+}
+
+// ── Scoring logic ──────────────────────────────────
+// A bid of N requires the bidding team to win at least N+6 hands (tricks).
+// bidPts = max(0, bidHands - 6); madeIt when bidPts >= bid.
+function calcGame(bidTeamIsA, bid, bidHands) {
+  const otherHands = 13 - bidHands;
+  const bidPts = Math.max(0, bidHands - 6);
+  const otherPts = Math.max(0, otherHands - 6);
+  const madeIt = bidPts >= bid;
+  const bidDelta = madeIt ? bidPts : -bid;
+  const isBos = madeIt && bidHands === 13;
+  const isCam = madeIt && bidHands === 12;
+  const isSet = !madeIt;
+  return { madeIt, bidPts, otherPts, bidDelta, otherDelta: otherPts, isBos, isCam, isSet, otherHands };
+}
+
+function updatePreview() {
+  const ok = fBidTeam && fBidder && fBid !== null && fHands !== null;
+  const kamOk = !fKam || fKamOutcome !== null;
+  const formReady = ok && kamOk;
+
+  updateStickyBtn(formReady);
+
+  let isBos=false, isCam=false, isSet=false, bidBlitz=false;
+  if (ok) {
+    const res = calcGame(fBidTeam==='A', fBid, fHands);
+    isBos = res.isBos; isCam = res.isCam; isSet = res.isSet;
+    const s = S.session;
+    bidBlitz = fBidTeam === 'A' ? s.scoreA < 0 : s.scoreB < 0;
+  }
+
+  document.getElementById('chip-boston').classList.toggle('on', isBos);
+  document.getElementById('chip-cambridge').classList.toggle('on', isCam);
+  document.getElementById('chip-set').classList.toggle('on', isSet);
+  document.getElementById('chip-blitz').classList.toggle('on', bidBlitz);
+
+  const prev = document.getElementById('preview');
+  if (!ok) { prev.innerHTML = 'Select options above to see the result.'; return; }
+
+  const rot = curRot();
+  const cfg = S.session.cfg;
+  const res = calcGame(fBidTeam==='A', fBid, fHands);
+  const bidTeamNames = fBidTeam==='A' ? `${rot[0]} & ${rot[1]}` : `${rot[2]} & ${rot[3]}`;
+  const otherTeamNames = fBidTeam==='A' ? `${rot[2]} & ${rot[3]}` : `${rot[0]} & ${rot[1]}`;
+  const blitzMult = bidBlitz ? cfg.blitz : 1;
+  const lines = [];
+
+  if (fKam && fKamOutcome) {
+    const base = cfg.win * blitzMult;
+    if (fKamOutcome === 'made') {
+      const p = (base * cfg.kw).toFixed(2);
+      lines.push(`<span class="made">Kamikaze made! ${bidTeamNames} collect $${p}${bidBlitz?' (blitz)':''}</span>`);
+    } else {
+      const p = (base * cfg.kl).toFixed(2);
+      lines.push(`<span class="set">Kamikaze set — ${otherTeamNames} collect $${p}${bidBlitz?' (blitz)':''}</span>`);
+    }
+  } else if (!fKam) {
+    if (res.madeIt) {
+      let payout = cfg.win * blitzMult;
+      if (res.isBos) payout += cfg.boston * blitzMult;
+      if (res.isCam) payout += cfg.cam * blitzMult;
+      lines.push(`<span class="made">${bidTeamNames} made it — collect $${payout.toFixed(2)}${bidBlitz?' (blitz)':''}</span>`);
+      if (res.isBos) lines.push(`<span class="gold">Boston! +$${(cfg.boston*blitzMult).toFixed(2)} bonus</span>`);
+      if (res.isCam) lines.push(`<span class="gold">Cambridge! +$${(cfg.cam*blitzMult).toFixed(2)} bonus</span>`);
+    } else {
+      const pen = (cfg.set * blitzMult).toFixed(2);
+      lines.push(`<span class="set">${bidTeamNames} set — pay $${pen}${bidBlitz?' (blitz)':''}</span>`);
+    }
+    if (res.otherPts > 0) lines.push(`${otherTeamNames} win ${res.otherHands} hands (+${res.otherPts} pts)`);
+  } else {
+    lines.push('<span class="warn">Select Kamikaze outcome</span>');
+  }
+
+  const s = S.session;
+  const aScore = s.scoreA + (fBidTeam==='A' ? res.bidDelta : res.otherDelta);
+  const bScore = s.scoreB + (fBidTeam==='B' ? res.bidDelta : res.otherDelta);
+  lines.push(`Score after: ${rot[0]}/${rot[1]}: <strong>${aScore}</strong> — ${rot[2]}/${rot[3]}: <strong>${bScore}</strong>`);
+  prev.innerHTML = lines.join('<br>');
+}
+
+// ── Log game ───────────────────────────────────────
+function logGame() {
+  if (!S.session) return;
+  const s = S.session;
+  const cfg = s.cfg;
+  const rot = curRot();
+  const res = calcGame(fBidTeam==='A', fBid, fHands);
+  const bidTeam = fBidTeam==='A' ? [rot[0],rot[1]] : [rot[2],rot[3]];
+  const otherTeam = fBidTeam==='A' ? [rot[2],rot[3]] : [rot[0],rot[1]];
+
+  const prevScoreA = s.scoreA, prevScoreB = s.scoreB;
+  const bidBlitz = fBidTeam==='A' ? prevScoreA < 0 : prevScoreB < 0;
+  const blitzMult = bidBlitz ? cfg.blitz : 1;
+
+  // Update scores
+  if (fBidTeam==='A') { s.scoreA += res.bidDelta; s.scoreB += res.otherDelta; }
+  else { s.scoreB += res.bidDelta; s.scoreA += res.otherDelta; }
+
+  // Money delta
+  const delta = {};
+  S.players.forEach(p => delta[p] = 0);
+
+  if (fKam) {
+    const base = cfg.win * blitzMult;
+    if (fKamOutcome === 'made') {
+      const pay = base * cfg.kw;
+      bidTeam.forEach(p => delta[p] += pay);
+      otherTeam.forEach(p => delta[p] -= pay);
+    } else {
+      const pen = base * cfg.kl;
+      otherTeam.forEach(p => delta[p] += pen);
+      bidTeam.forEach(p => delta[p] -= pen);
+    }
+  } else {
+    if (res.madeIt) {
+      let pay = cfg.win * blitzMult;
+      if (res.isBos) pay += cfg.boston * blitzMult;
+      if (res.isCam) pay += cfg.cam * blitzMult;
+      bidTeam.forEach(p => delta[p] += pay);
+      otherTeam.forEach(p => delta[p] -= pay);
+    } else {
+      const pen = cfg.set * blitzMult;
+      bidTeam.forEach(p => delta[p] -= pen);
+      otherTeam.forEach(p => delta[p] += pen);
+    }
+  }
+
+  S.players.forEach(p => s.money[p] = (s.money[p]||0) + delta[p]);
+
+  // Stats
+  const ps = s.pStats;
+  S.players.forEach(p => { if (!ps[p]) ps[p]={wins:0,losses:0,sets:0,bostons:0,cams:0,bids:0,bidsMade:0,kamA:0,kamM:0}; });
+  if (!fKam) {
+    if (res.madeIt) { bidTeam.forEach(p=>{ps[p].wins++; if(res.isBos)ps[p].bostons++; if(res.isCam)ps[p].cams++;}); otherTeam.forEach(p=>ps[p].losses++); }
+    else { bidTeam.forEach(p=>{ps[p].losses++;ps[p].sets++;}); otherTeam.forEach(p=>ps[p].wins++); }
+  } else {
+    bidTeam.forEach(p=>ps[p].kamA++);
+    if (fKamOutcome==='made') { bidTeam.forEach(p=>{ps[p].wins++;ps[p].kamM++;}); otherTeam.forEach(p=>ps[p].losses++); }
+    else { bidTeam.forEach(p=>{ps[p].losses++;ps[p].sets++;}); otherTeam.forEach(p=>ps[p].wins++); }
+  }
+  if (ps[fBidder]) { ps[fBidder].bids++; if(res.madeIt && !fKam) ps[fBidder].bidsMade++; }
+
+  // Record game (snapshot pre-undo state too)
+  const game = {
+    n: s.games.length+1, rotIdx: s.rotationIdx,
+    teamA:[rot[0],rot[1]], teamB:[rot[2],rot[3]],
+    bidTeam:fBidTeam, bidder:fBidder, bid:fBid,
+    bidHands:fHands, otherHands:res.otherHands,
+    madeIt:res.madeIt, set:res.isSet,
+    boston:res.isBos, cambridge:res.isCam,
+    blitz:bidBlitz, bidDelta:res.bidDelta, otherDelta:res.otherDelta,
+    kamikaze:fKam, kamOutcome:fKamOutcome,
+    delta, scoreA:s.scoreA, scoreB:s.scoreB,
+    // store previous scores for undo
+    prevScoreA, prevScoreB,
+    ts: Date.now()
+  };
+  s.games.push(game);
+
+  // Check session end
+  if (s.scoreA >= cfg.pts || s.scoreB >= cfg.pts) {
+    const winTeam = s.scoreA >= cfg.pts ? `${rot[0]} & ${rot[1]}` : `${rot[2]} & ${rot[3]}`;
+    const losingInBlitz = s.scoreA >= cfg.pts ? s.scoreB < 0 : s.scoreA < 0;
+    const sessionBlitzMult = losingInBlitz ? cfg.blitz : 1;
+    const winPay = cfg.win * sessionBlitzMult;
+    const winTeamPlayers = s.scoreA >= cfg.pts ? [rot[0],rot[1]] : [rot[2],rot[3]];
+    const loseTeamPlayers = s.scoreA >= cfg.pts ? [rot[2],rot[3]] : [rot[0],rot[1]];
+    winTeamPlayers.forEach(p => s.money[p] = (s.money[p]||0) + winPay);
+    loseTeamPlayers.forEach(p => s.money[p] = (s.money[p]||0) - winPay);
+
+    S.allSessions.push({ games:[...s.games], money:{...s.money}, winTeam, endedAt:Date.now() });
+
+    document.getElementById('session-banner').classList.add('show');
+    document.getElementById('session-banner-title').textContent = `${winTeam} win the session!`;
+    document.getElementById('session-banner-sub').textContent =
+      `$${winPay.toFixed(2)} session payout${losingInBlitz?' (blitz multiplier applied)':''}. Starting next rotation.`;
+
+    s.rotationIdx++;
+    s.scoreA = 0; s.scoreB = 0;
+
+    // Flash rotation indicator
+    const ri = document.getElementById('rotation-info');
+    if (ri) {
+      ri.classList.add('flash');
+      setTimeout(() => ri.classList.remove('flash'), 1200);
+    }
+    // Flash score panels
+    document.querySelectorAll('.score-panel').forEach(p => {
+      p.classList.add('rot-flash');
+      setTimeout(() => p.classList.remove('rot-flash'), 700);
+    });
+  }
+
+  resetForm();
+
+  S.players.forEach(p => {
+    if ((s.money[p]||0) >= cfg.target) {
+      setTimeout(()=>alert(`🏆 ${p} has reached $${cfg.target}! Check the standings.`), 300);
+    }
+  });
+
+  save();
+  renderPlay();
+}
+
+function resetForm() {
+  fBidTeam=null; fBidder=null; fBid=null; fKam=false; fKamOutcome=null;
+  fHands=7;
+  ['lbl-step1','lbl-step2','lbl-step3','lbl-step4'].forEach(id => markStep(id, false));
+  document.getElementById('kam-toggle-label').classList.remove('on');
+  document.getElementById('kam-opts').classList.remove('show');
+  updateStickyBtn(false);
+}
+
+// ── Undo last game ─────────────────────────────────
+function undoLastGame() {
+  if (!S.session || !S.session.games.length) return;
+  if (!confirm('Undo the last logged game?')) return;
+  const s = S.session;
+  const g = s.games.pop();
+
+  // Restore scores
+  s.scoreA = g.prevScoreA;
+  s.scoreB = g.prevScoreB;
+
+  // Reverse money
+  S.players.forEach(p => {
+    s.money[p] = (s.money[p]||0) - (g.delta[p]||0);
+  });
+
+  // Reverse stats (best-effort)
+  const ps = s.pStats;
+  const bidTeam = g.bidTeam==='A' ? g.teamA : g.teamB;
+  const otherTeam = g.bidTeam==='A' ? g.teamB : g.teamA;
+  if (!g.kamikaze) {
+    if (g.madeIt) { bidTeam.forEach(p=>{if(ps[p]){ps[p].wins--;if(g.boston)ps[p].bostons--;if(g.cambridge)ps[p].cams--;}}); otherTeam.forEach(p=>{if(ps[p])ps[p].losses--;}); }
+    else { bidTeam.forEach(p=>{if(ps[p]){ps[p].losses--;ps[p].sets--;}}); otherTeam.forEach(p=>{if(ps[p])ps[p].wins--;}); }
+  } else {
+    bidTeam.forEach(p=>{if(ps[p])ps[p].kamA--;});
+    if (g.kamOutcome==='made') { bidTeam.forEach(p=>{if(ps[p]){ps[p].wins--;ps[p].kamM--;}}); otherTeam.forEach(p=>{if(ps[p])ps[p].losses--;}); }
+    else { bidTeam.forEach(p=>{if(ps[p]){ps[p].losses--;ps[p].sets--;}}); otherTeam.forEach(p=>{if(ps[p])ps[p].wins--;}); }
+  }
+  if (ps[g.bidder]) { ps[g.bidder].bids--; if(g.madeIt && !g.kamikaze) ps[g.bidder].bidsMade--; }
+
+  // If we just un-did a session-ending game that triggered an allSessions push,
+  // remove that session record too
+  if (S.allSessions.length && S.allSessions[S.allSessions.length-1].endedAt >= g.ts) {
+    S.allSessions.pop();
+    if (s.rotationIdx > 0) s.rotationIdx--;
+  }
+
+  document.getElementById('session-banner').classList.remove('show');
+  save();
+  renderPlay();
+}
+
+// ── Render Play ────────────────────────────────────
+function renderPlay() {
+  const hasSession = !!S.session;
+  document.getElementById('no-session-msg').style.display = hasSession ? 'none' : '';
+  document.getElementById('play-main').style.display = hasSession ? '' : 'none';
+  if (!hasSession) return;
+
+  const s = S.session;
+  const cfg = s.cfg;
+  const rot = curRot();
+  const rots = getRots(S.players);
+  const rotN = s.rotationIdx % rots.length;
+
+  document.getElementById('hdr-sub').textContent = `Session · ${new Date(s.startedAt).toLocaleDateString()}`;
+  document.getElementById('rot-label').textContent = `${rotN+1}/${rots.length}`;
+  document.getElementById('rot-teams-label').textContent = `${rot[0]} & ${rot[1]}  vs  ${rot[2]} & ${rot[3]}`;
+
+  // Score panels
+  function pips(score, target, team) {
+    if (score < 0) {
+      return Array.from({length:Math.abs(score)},()=>`<div class="pip neg"></div>`).join('') +
+        `<span class="blitz-tag">Blitz</span>`;
+    }
+    const cls = team==='a' ? 'on-a' : 'on-b';
+    return Array.from({length:target},(_, i)=>`<div class="pip ${i<score?cls:''}"></div>`).join('');
+  }
+  const blitzA = s.scoreA<0, blitzB = s.scoreB<0;
+  const pctA = Math.max(0, Math.min(100, blitzA ? 0 : (s.scoreA/cfg.pts*100)));
+  const pctB = Math.max(0, Math.min(100, blitzB ? 0 : (s.scoreB/cfg.pts*100)));
+  document.getElementById('score-panels').innerHTML = `
+    <div class="score-panel team-a ${blitzA?'blitz':s.scoreA>=cfg.pts?'winner':''}">
+      <div class="score-team-label">Team A</div>
+      <div class="score-names">${rot[0]} & ${rot[1]}</div>
+      <div class="score-big ${blitzA?'blitz-num':''}">${s.scoreA}</div>
+      <div class="score-target">of ${cfg.pts} pts</div>
+      <div class="score-bar-wrap"><div class="score-bar-fill" style="width:${pctA}%"></div></div>
+      <div class="score-pips">${pips(s.scoreA, cfg.pts, 'a')}</div>
+    </div>
+    <div class="score-panel team-b ${blitzB?'blitz':s.scoreB>=cfg.pts?'winner':''}">
+      <div class="score-team-label">Team B</div>
+      <div class="score-names">${rot[2]} & ${rot[3]}</div>
+      <div class="score-big ${blitzB?'blitz-num':''}">${s.scoreB}</div>
+      <div class="score-target">of ${cfg.pts} pts</div>
+      <div class="score-bar-wrap"><div class="score-bar-fill" style="width:${pctB}%"></div></div>
+      <div class="score-pips">${pips(s.scoreB, cfg.pts, 'b')}</div>
+    </div>`;
+
+  // Money
+  const target = cfg.target;
+  const sorted = S.players.slice().sort((a,b)=>(s.money[b]||0)-(s.money[a]||0));
+  document.getElementById('money-rows').innerHTML = sorted.map((p,i) => {
+    const m = s.money[p]||0;
+    const ps = s.pStats[p]||{};
+    const bp = ps.bids ? `${Math.round(ps.bidsMade/ps.bids*100)}%` : '—';
+    const cls = m>0?'pos':m<0?'neg':'zero';
+    const pct = Math.max(0, Math.min(100, (m / target) * 100));
+    const barCls = m >= 0 ? 'pos' : 'neg';
+    return `<div class="money-row">
+      <div class="money-rank">${i+1}</div>
+      <div style="flex:1;min-width:0">
+        <div class="money-name">${p}</div>
+        <div class="money-progress-wrap"><div class="money-progress-fill ${barCls}" style="width:${pct}%"></div></div>
+        <div class="money-stats" style="margin-top:3px">
+          <span class="money-stat">${ps.wins||0}W/${ps.losses||0}L</span>
+          <span class="money-stat">${ps.sets||0} sets</span>
+          <span class="money-stat">Bid ${bp}</span>
+        </div>
+      </div>
+      <div class="money-amt ${cls}">$${m.toFixed(2)}</div>
+    </div>`;
+  }).join('');
+
+  // Team toggle
+  document.getElementById('team-toggle').innerHTML = `
+    <button class="team-btn ${fBidTeam==='A'?'sel-a':''}" data-team="A" onclick="setBidTeam('A')">
+      <div class="team-btn-label">Team A</div>
+      <div class="team-btn-names">${rot[0]} & ${rot[1]}</div>
+    </button>
+    <button class="team-btn ${fBidTeam==='B'?'sel-b':''}" data-team="B" onclick="setBidTeam('B')">
+      <div class="team-btn-label b">Team B</div>
+      <div class="team-btn-names">${rot[2]} & ${rot[3]}</div>
+    </button>`;
+
+  // Bid grid
+  document.getElementById('bid-grid').innerHTML = [1,2,3,4,5,6,7].map(b => {
+    const tag = b===7?'Max':'';
+    const tip = b===7?'Bid all 13 — Boston if you win all 13':'';
+    const selCls = fBid===b ? ' '+(fBidTeam?teamSelClass(fBidTeam):'sel-a') : '';
+    return `<button class="bid-btn${selCls}" data-bid="${b}" ${tip?`data-tip="${tip}"`:''}onclick="setBid(${b})">
+      ${b}<span class="bid-tag">${tag}</span>
+    </button>`;
+  }).join('');
+
+  rebuildBidderGrid();
+  renderHandsGrid();
+  updatePreview();
+
+  // Games this session (current rotation only)
+  const rotGames = s.games.filter(g => g.rotIdx === rotN);
+  document.getElementById('game-count').textContent = rotGames.length;
+  document.getElementById('btn-undo').style.display = s.games.length ? '' : 'none';
+
+  if (!rotGames.length) {
+    document.getElementById('games-list').innerHTML = `<div style="text-align:center;padding:16px;color:var(--cream-dim);font-size:13px">No games yet</div>`;
+  } else {
+    document.getElementById('games-list').innerHTML = `<table class="games-table">
+      <thead><tr><th>#</th><th>Bidder</th><th>Bid</th><th class="col-hands">Hands</th><th>Pts</th><th>Flags</th><th>Score</th></tr></thead>
+      <tbody>${rotGames.map(g => {
+        const flags = [
+          g.boston?'<span class="badge bos">Bos</span>':'',
+          g.cambridge?'<span class="badge cam">Cam</span>':'',
+          g.set?'<span class="badge set">Set</span>':'',
+          g.kamikaze?'<span class="badge kam">Kam</span>':'',
+          g.blitz?'<span class="badge blz">Blz</span>':''
+        ].filter(Boolean).join('');
+        const ptsFmt = g.madeIt
+          ? `<span style="color:var(--green-bright)">+${g.bidDelta}</span>`
+          : `<span style="color:var(--red-bright)">${g.bidDelta}</span>`;
+        return `<tr>
+          <td style="color:var(--gold-dim);font-family:'DM Mono',monospace">${g.n}</td>
+          <td class="em">${g.bidder}</td>
+          <td style="font-family:'DM Mono',monospace">${g.bid}</td>
+          <td class="col-hands" style="font-family:'DM Mono',monospace">${g.bidHands}–${g.otherHands}</td>
+          <td>${ptsFmt}</td>
+          <td>${flags||'–'}</td>
+          <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--cream-dim)">${g.scoreA}–${g.scoreB}</td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+  }
+}
+
+// ── Render History ─────────────────────────────────
+function renderHistory() {
+  const all = S.allSessions || [];
+  const cur = S.session && S.session.games.length ? [S.session] : [];
+  const sessions = [...all.map(s=>({...s,isCurrent:false})), ...cur.map(s=>({...s,isCurrent:true}))];
+  if (!sessions.length) {
+    document.getElementById('history-content').innerHTML = '<div class="empty"><div class="empty-icon">♦</div><div class="empty-title">No history yet</div></div>';
+    return;
+  }
+  let html = '';
+  sessions.slice().reverse().forEach((sess, si) => {
+    const label = sess.isCurrent ? 'Current session' : `Session ${all.length - si}`;
+    const games = sess.games || [];
+    html += `<div class="history-session"><div class="history-session-hdr">${label} · ${games.length} games</div>
+    <div class="card" style="padding:0;overflow:hidden">
+    <table class="games-table"><thead><tr><th>#</th><th>Bidder</th><th>Bid</th><th class="col-hands">Hands</th><th>Result</th><th>Flags</th><th>Score</th></tr></thead><tbody>`;
+    games.slice().reverse().forEach(g => {
+      const flags = [
+        g.boston?'<span class="badge bos">Bos</span>':'',
+        g.cambridge?'<span class="badge cam">Cam</span>':'',
+        g.set?'<span class="badge set">Set</span>':'',
+        g.kamikaze?'<span class="badge kam">Kam</span>':'',
+        g.blitz?'<span class="badge blz">Blz</span>':''
+      ].filter(Boolean).join('');
+      const res = g.madeIt ? `<span style="color:var(--green-bright)">Made</span>` : `<span style="color:var(--red-bright)">Set</span>`;
+      html += `<tr>
+        <td style="color:var(--gold-dim);font-family:'DM Mono',monospace">${g.n}</td>
+        <td class="em">${g.bidder}</td>
+        <td style="font-family:'DM Mono',monospace">${g.bid}</td>
+        <td class="col-hands" style="font-family:'DM Mono',monospace">${g.bidHands}–${g.otherHands}</td>
+        <td>${res}</td>
+        <td>${flags||'–'}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--cream-dim)">${g.scoreA}–${g.scoreB}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+  });
+  document.getElementById('history-content').innerHTML = html;
+}
+
+// ── Render Stats ───────────────────────────────────
+function renderStats() {
+  if (!S.session || !S.session.games.length) {
+    document.getElementById('stats-content').innerHTML = '<div class="empty"><div class="empty-icon">♥</div><div class="empty-title">No stats yet</div></div>';
+    return;
+  }
+  const s = S.session;
+  const ps = s.pStats;
+  let html = '<div class="stat-grid">';
+  S.players.forEach(p => {
+    const st = ps[p]||{};
+    const m = s.money[p]||0;
+    const total = (st.wins||0)+(st.losses||0);
+    const wr = total ? Math.round(st.wins/total*100)+'%' : '—';
+    const bp = st.bids ? Math.round(st.bidsMade/st.bids*100)+'%' : '—';
+    const kam = st.kamA ? `${st.kamM}/${st.kamA}` : '—';
+    const mCls = m>=0?'color:var(--green-bright)':'color:var(--red-bright)';
+    html += `<div class="stat-card">
+      <div class="stat-player">${p}</div>
+      <div class="stat-row"><span class="stat-key">Money</span><span class="stat-val" style="${mCls}">$${m.toFixed(2)}</span></div>
+      <div class="stat-row"><span class="stat-key">Win rate</span><span class="stat-val">${wr}</span></div>
+      <div class="stat-row"><span class="stat-key">W / L</span><span class="stat-val">${st.wins||0} / ${st.losses||0}</span></div>
+      <div class="stat-row"><span class="stat-key">Sets taken</span><span class="stat-val" style="${(st.sets||0)>0?'color:var(--red-bright)':''}">${st.sets||0}</span></div>
+      <div class="stat-row"><span class="stat-key">Bid success</span><span class="stat-val">${bp}</span></div>
+      <div class="stat-row"><span class="stat-key">Total bids</span><span class="stat-val">${st.bids||0}</span></div>
+      <div class="stat-row"><span class="stat-key">Bostons</span><span class="stat-val" style="color:var(--green-bright)">${st.bostons||0}</span></div>
+      <div class="stat-row"><span class="stat-key">Cambridges</span><span class="stat-val" style="color:var(--amber)">${st.cams||0}</span></div>
+      <div class="stat-row"><span class="stat-key">Kamikaze</span><span class="stat-val">${kam}</span></div>
+    </div>`;
+  });
+  html += '</div>';
+
+  const pairs = {};
+  s.games.forEach(g => {
+    [[g.teamA,g.bidTeam==='A'],[g.teamB,g.bidTeam==='B']].forEach(([team,isBidTeam]) => {
+      if (!team) return;
+      const key = team.slice().sort().join(' & ');
+      if (!pairs[key]) pairs[key] = {games:0,wins:0,losses:0,net:0};
+      pairs[key].games++;
+      const won = isBidTeam ? g.madeIt : !g.madeIt;
+      if (won) pairs[key].wins++; else pairs[key].losses++;
+      const p0 = team[0];
+      pairs[key].net += (g.delta[p0]||0);
+    });
+  });
+  html += `<div class="card"><div class="card-title">Partnership records</div>
+  <table class="games-table"><thead><tr><th>Partners</th><th>Games</th><th>W</th><th>L</th><th>Net $</th></tr></thead><tbody>`;
+  Object.entries(pairs).sort((a,b)=>b[1].net-a[1].net).forEach(([pair,st]) => {
+    const nc = st.net>=0?'color:var(--green-bright)':'color:var(--red-bright)';
+    html += `<tr><td class="em">${pair}</td><td>${st.games}</td>
+      <td style="color:var(--green-bright)">${st.wins}</td>
+      <td style="color:var(--red-bright)">${st.losses}</td>
+      <td style="${nc}">$${st.net.toFixed(2)}</td></tr>`;
+  });
+  html += '</tbody></table></div>';
+
+  document.getElementById('stats-content').innerHTML = html;
+}
+
+// ── Render Setup ───────────────────────────────────
+function renderSetup() {
+  const list = document.getElementById('player-list-setup');
+  const teamLabels = ['Team A','Team A','Team B','Team B'];
+  const teamColors = ['var(--gold-dim)','var(--gold-dim)','var(--teal-dim)','var(--teal-dim)'];
+  list.innerHTML = S.players.map((p,i) => {
+    const label = i < 4 ? `<span style="font-size:9px;font-family:'DM Mono',monospace;letter-spacing:0.08em;color:${teamColors[i]};text-transform:uppercase;margin-right:8px">${teamLabels[i]}</span>` : '';
+    return `<div class="player-list-item">
+      <div style="display:flex;align-items:center;flex:1;min-width:0">
+        ${label}<span class="player-list-name">${p}</span>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center">
+        <button class="btn-rm" onclick="movePlayer(${i},-1)" ${i===0?'disabled':''} style="padding:3px 8px">↑</button>
+        <button class="btn-rm" onclick="movePlayer(${i},1)" ${i===S.players.length-1?'disabled':''} style="padding:3px 8px">↓</button>
+        <button class="btn-rm" onclick="removePlayer(${i})">Remove</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function movePlayer(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= S.players.length) return;
+  [S.players[i], S.players[j]] = [S.players[j], S.players[i]];
+  save(); renderSetup();
+}
+
+function addPlayer() {
+  const inp = document.getElementById('inp-new-player');
+  const name = inp.value.trim();
+  if (!name || S.players.includes(name)) return;
+  S.players.push(name);
+  inp.value = '';
+  save(); renderSetup();
+}
+
+function removePlayer(i) {
+  if (S.players.length <= 4) return alert('Need at least 4 players.');
+  S.players.splice(i,1);
+  save(); renderSetup();
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(S, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'whist-data-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+
+function importData() {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.onchange = e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        if (!d.players || !Array.isArray(d.players)) throw new Error('Invalid file');
+        if (!confirm('Replace all current data with imported data?')) return;
+        S = d; save(); renderSetup();
+        if (S.session) nav('play'); else nav('setup');
+      } catch(err) { alert('Could not read file: ' + err.message); }
+    };
+    reader.readAsText(file);
+  };
+  inp.click();
+}
+
+function startSession() {
+  if (S.players.length < 4) return alert('Need at least 4 players.');
+  if (S.session && S.session.games.length > 0) {
+    if (!confirm('Starting a new session will end the current one. Continue?')) return;
+  }
+  const g = id => parseFloat(document.getElementById(id).value);
+  const cfg = { pts:g('cfg-pts'), target:g('cfg-target'), win:g('cfg-win'), boston:g('cfg-boston'), cam:g('cfg-cam'), set:g('cfg-set'), blitz:g('cfg-blitz'), kw:g('cfg-kw'), kl:g('cfg-kl') };
+  S.cfg = cfg;
+  S.session = { games:[], rotationIdx:0, scoreA:0, scoreB:0, money:{}, pStats:{}, cfg, startedAt:Date.now() };
+  S.players.forEach(p => { S.session.money[p]=0; S.session.pStats[p]={wins:0,losses:0,sets:0,bostons:0,cams:0,bids:0,bidsMade:0,kamA:0,kamM:0}; });
+  resetForm();
+  document.getElementById('session-banner').classList.remove('show');
+  save();
+  nav('play');
+}
+
+function resetAll() {
+  if (!confirm('Clear all data?')) return;
+  S.session=null; S.allSessions=[];
+  save(); nav('setup');
+}
+
+// ── Init ──────────────────────────────────────────
+load();
+renderSetup();
+if (S.session) { nav('play'); } else { nav('setup'); }
+</script>
+</body>
+</html>
