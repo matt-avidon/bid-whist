@@ -1919,6 +1919,9 @@ if (S.session) { nav('play'); } else { nav('setup'); }
 // Firebase real-time listener — syncs changes from all users
 db.ref('whist').on('value', snapshot => {
   const data = snapshot.val();
+  // Mark as live as soon as Firebase responds (even if empty)
+  const el = document.getElementById('conn-indicator');
+  if (el) { el.textContent = '⬤ live'; el.style.color = 'var(--teal)'; }
   if (!data) return;
   S = data;
   localStorage.setItem('whist4', JSON.stringify(S));
@@ -1931,16 +1934,11 @@ db.ref('whist').on('value', snapshot => {
   // Don't re-render setup to avoid interrupting text input
 });
 
-// Connection status dot
+// Connection status dot — fallback to offline if disconnected
 db.ref('.info/connected').on('value', snap => {
-  const el = document.getElementById('conn-indicator');
-  if (!el) return;
-  if (snap.val()) {
-    el.textContent = '⬤ live';
-    el.style.color = 'var(--teal)';
-  } else {
-    el.textContent = '⬤ offline';
-    el.style.color = 'var(--red-bright)';
+  if (snap.val() === false) {
+    const el = document.getElementById('conn-indicator');
+    if (el) { el.textContent = '⬤ offline'; el.style.color = 'var(--red-bright)'; }
   }
 });
 </script>
