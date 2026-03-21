@@ -1950,6 +1950,16 @@ db.ref('.info/connected').on('value', snap => {
     if (el) { el.textContent = '⬤ offline'; el.style.color = 'var(--red-bright)'; }
   }
 });
+
+// Fallback: if still showing "connecting" after 2s, retry with a direct read
+setTimeout(() => {
+  const el = document.getElementById('conn-indicator');
+  if (el && el.textContent.includes('connecting')) {
+    db.ref('whist').once('value')
+      .then(snap => { setLive(); applyRemoteData(snap.val()); })
+      .catch(() => {});
+  }
+}, 2000);
 </script>
 </body>
 </html>
