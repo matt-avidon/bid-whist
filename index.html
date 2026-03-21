@@ -1228,17 +1228,62 @@ body { -webkit-text-size-adjust: 100%; }
 /* ── Insights tab bar ── */
 .insights-tabs {
   display: flex; gap: 0; border-bottom: 1px solid var(--border);
-  background: var(--felt-light); padding: 0 16px;
+  background: var(--felt-light); padding: 0 8px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
 }
 .insights-tab-btn {
   background: none; border: none; border-bottom: 2px solid transparent;
   color: var(--cream-dim); font-size: 12px; font-family: 'DM Sans', sans-serif;
-  font-weight: 500; padding: 9px 14px; cursor: pointer;
+  font-weight: 500; padding: 9px 12px; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: color 0.15s, border-color 0.15s;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.02em; white-space: nowrap; flex-shrink: 0;
 }
 .insights-tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+/* ── Trend tab ── */
+.trend-metric-picker {
+  display: flex; gap: 6px; flex-wrap: wrap; padding: 14px 16px 4px;
+}
+.trend-metric-btn {
+  background: var(--felt-lighter); border: 1px solid var(--border);
+  color: var(--cream-dim); font-size: 11px; font-family: 'DM Sans', sans-serif;
+  padding: 5px 12px; border-radius: 20px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: all 0.15s;
+}
+.trend-metric-btn.active {
+  background: rgba(201,168,76,0.15); border-color: var(--gold-dim);
+  color: var(--gold);
+}
+.trend-chart-wrap {
+  margin: 0 16px 4px; border-radius: 8px;
+  background: var(--felt-lighter); border: 1px solid var(--border);
+  overflow: hidden;
+}
+.trend-chart-wrap svg { display: block; width: 100%; }
+.trend-section { padding: 0 16px 20px; }
+.trend-section-title {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--gold-dim); font-family: 'DM Mono', monospace;
+  margin: 16px 0 8px;
+}
+.trend-stat-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 0; border-bottom: 1px solid var(--border);
+}
+.trend-stat-row:last-child { border-bottom: none; }
+.trend-stat-label { font-size: 12px; color: var(--cream-dim); }
+.trend-stat-val { font-size: 13px; font-weight: 500; font-family: 'DM Mono', monospace; color: var(--cream); }
+.trend-sparkrow {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  margin-top: 10px;
+}
+.trend-spark-cell {
+  background: var(--felt-lighter); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px;
+}
+.trend-spark-cell svg { display: block; width: 100%; margin-top: 4px; }
+.trend-spark-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--cream-dim); font-family: 'DM Mono', monospace; }
+.trend-spark-val { font-size: 14px; font-weight: 500; font-family: 'DM Mono', monospace; color: var(--cream); margin-top: 2px; }
 .insights-archetype-badge {
   display: inline-block; padding: 3px 10px; border-radius: 20px;
   font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif;
@@ -1711,6 +1756,7 @@ body { -webkit-text-size-adjust: 100%; }
     <button class="insights-tab-btn active" data-tab="overview" onclick="setInsightsTab('overview')">Overview</button>
     <button class="insights-tab-btn" data-tab="advanced" onclick="setInsightsTab('advanced')">🔬 Nerd</button>
     <button class="insights-tab-btn" data-tab="card" onclick="setInsightsTab('card')">🃏 Card</button>
+    <button class="insights-tab-btn" data-tab="trend" onclick="setInsightsTab('trend')">📈 Trend</button>
   </div>
   <div class="insights-body" id="insights-body"></div>
 </div>
@@ -2874,6 +2920,7 @@ function toggleHistorySession(key) {
 // ── Individual Insights ────────────────────────────
 let _insightsPlayer = null;
 let _insightsTab = 'overview';
+let _trendMetric = 'winrate';
 
 function setInsightsTab(tab) {
   _insightsTab = tab;
@@ -3520,6 +3567,205 @@ function renderInsightsCard(player, games, allGames) {
   body.innerHTML = html;
 }
 
+// ── Trend Tab ─────────────────────────────────────
+function selectTrendMetric(m) {
+  _trendMetric = m;
+  renderInsights();
+}
+
+function makeTrendSVG(data, yMin, yMax, color, formatY) {
+  if (data.length < 2) return '';
+  const W = 320, H = 130;
+  const PL = 36, PR = 10, PT = 12, PB = 28;
+  const iW = W - PL - PR, iH = H - PT - PB;
+  const range = (yMax - yMin) || 1;
+  const xOf = i => PL + (i / (data.length - 1)) * iW;
+  const yOf = v => PT + iH - ((v - yMin) / range) * iH;
+
+  // Polyline points
+  const pts = data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ');
+
+  // Area fill path
+  const area = `M${xOf(0).toFixed(1)},${yOf(data[0]).toFixed(1)} ` +
+    data.slice(1).map((v, i) => `L${xOf(i+1).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ') +
+    ` L${xOf(data.length-1).toFixed(1)},${(PT+iH).toFixed(1)} L${xOf(0).toFixed(1)},${(PT+iH).toFixed(1)} Z`;
+
+  // Reference line (final overall value)
+  const refVal = data[data.length - 1];
+  const refY = yOf(refVal).toFixed(1);
+
+  // Y-axis guide labels (3 levels: min, mid, max)
+  const yLabels = [yMin, (yMin+yMax)/2, yMax].map(v => ({
+    y: yOf(v).toFixed(1), label: formatY(v)
+  }));
+
+  // X-axis tick labels (up to 5 evenly spaced)
+  const xStep = Math.max(1, Math.floor(data.length / 4));
+  const xLabels = [];
+  for (let i = 0; i < data.length; i += xStep) xLabels.push(i);
+  if (xLabels[xLabels.length-1] !== data.length-1) xLabels.push(data.length-1);
+
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="height:${H}px">
+    <defs>
+      <linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.25"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0.02"/>
+      </linearGradient>
+    </defs>
+    <!-- Grid lines -->
+    ${yLabels.map(l => `<line x1="${PL}" y1="${l.y}" x2="${W-PR}" y2="${l.y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`).join('')}
+    <!-- Area fill -->
+    <path d="${area}" fill="url(#tg)"/>
+    <!-- Reference line (all-time avg) -->
+    <line x1="${PL}" y1="${refY}" x2="${W-PR}" y2="${refY}" stroke="${color}" stroke-opacity="0.35" stroke-width="1" stroke-dasharray="4 3"/>
+    <!-- Main line -->
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <!-- Data points -->
+    ${data.map((v, i) => {
+      const cx = xOf(i).toFixed(1), cy = yOf(v).toFixed(1);
+      const isLast = i === data.length - 1;
+      return `<circle cx="${cx}" cy="${cy}" r="${isLast?4:2.5}" fill="${color}" opacity="${isLast?1:0.7}"/>`;
+    }).join('')}
+    <!-- Y-axis labels -->
+    ${yLabels.map(l => `<text x="${PL-4}" y="${parseFloat(l.y)+4}" text-anchor="end" font-size="8" fill="rgba(255,255,255,0.35)" font-family="monospace">${l.label}</text>`).join('')}
+    <!-- X-axis labels -->
+    ${xLabels.map(i => `<text x="${xOf(i).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.35)" font-family="monospace">${i+1}</text>`).join('')}
+    <!-- Axes -->
+    <line x1="${PL}" y1="${PT}" x2="${PL}" y2="${PT+iH}" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+    <line x1="${PL}" y1="${PT+iH}" x2="${W-PR}" y2="${PT+iH}" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+  </svg>`;
+}
+
+function makeSparkSVG(data, color) {
+  if (data.length < 2) return '';
+  const W = 80, H = 28;
+  const mn = Math.min(...data), mx = Math.max(...data);
+  const range = (mx - mn) || 1;
+  const xOf = i => (i / (data.length - 1)) * W;
+  const yOf = v => H - 2 - ((v - mn) / range) * (H - 4);
+  const pts = data.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" style="height:${H}px">
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle cx="${xOf(data.length-1).toFixed(1)}" cy="${yOf(data[data.length-1]).toFixed(1)}" r="2.5" fill="${color}"/>
+  </svg>`;
+}
+
+function renderInsightsTrend(player, games) {
+  const body = document.getElementById('insights-body');
+
+  // Sort games by timestamp
+  const sorted = [...games].sort((a, b) => (a.ts||0) - (b.ts||0));
+
+  // Build rolling series for each metric
+  const seriesWR = [], seriesPBA = [], seriesAB = [], seriesSR = [], seriesBR = [];
+  let wins = 0, bids = 0, bidsMade = 0, bidSum = 0, sets = 0;
+
+  sorted.forEach((g, i) => {
+    const isOnTeam = true; // already filtered to player's games
+    const onBidTeam = (g.bidTeam==='A' ? g.teamA : g.teamB)||[];
+    const didWinGame = (() => {
+      if (g.kamikaze) return g.kamOutcome === 'made' ? onBidTeam.includes(player) : !onBidTeam.includes(player);
+      return g.madeIt ? onBidTeam.includes(player) : !onBidTeam.includes(player);
+    })();
+    if (didWinGame) wins++;
+    seriesWR.push(wins / (i + 1));
+
+    const playerBid = g.bidder === player && !g.kamikaze;
+    if (playerBid) {
+      bids++;
+      bidSum += g.bid;
+      if (g.madeIt) bidsMade++;
+      if (!g.madeIt) sets++;
+    }
+    seriesPBA.push(bids > 0 ? bidsMade / bids : null);
+    seriesAB.push(bids > 0 ? bidSum / bids : null);
+    seriesSR.push(bids > 0 ? sets / bids : null);
+    seriesBR.push(bids / (i + 1));
+  });
+
+  // Config for each metric
+  const metrics = {
+    winrate: { label: 'Win Rate', series: seriesWR, color: 'var(--teal)', fmt: v => `${Math.round(v*100)}%`, yMin: 0, yMax: 1, fmtY: v => `${Math.round(v*100)}%` },
+    pba:     { label: 'Bid %',    series: seriesPBA, color: 'var(--gold)', fmt: v => v===null?'—':`${Math.round(v*100)}%`, yMin: 0, yMax: 1, fmtY: v => `${Math.round(v*100)}%` },
+    avgbid:  { label: 'Avg Bid',  series: seriesAB,  color: '#a78bfa', fmt: v => v===null?'—':v.toFixed(2), yMin: 1, yMax: 7, fmtY: v => v.toFixed(1) },
+    setrate: { label: 'Set Rate', series: seriesSR,  color: 'var(--red-bright)', fmt: v => v===null?'—':`${Math.round(v*100)}%`, yMin: 0, yMax: 1, fmtY: v => `${Math.round(v*100)}%` },
+    bidrate: { label: 'Bid Rate', series: seriesBR,  color: '#60a5fa', fmt: v => `${Math.round(v*100)}%`, yMin: 0, yMax: 1, fmtY: v => `${Math.round(v*100)}%` },
+  };
+
+  const mc = metrics[_trendMetric];
+  // Strip nulls for the main chart (for pba/avgbid/setrate which only update on bid games)
+  const chartData = mc.series.filter(v => v !== null);
+  const G = sorted.length;
+
+  // Picker HTML
+  let pickerHtml = '<div class="trend-metric-picker">';
+  Object.entries(metrics).forEach(([key, cfg]) => {
+    pickerHtml += `<button class="trend-metric-btn${_trendMetric===key?' active':''}" onclick="selectTrendMetric('${key}')">${cfg.label}</button>`;
+  });
+  pickerHtml += '</div>';
+
+  // Main chart
+  const noData = chartData.length < 2;
+  let chartHtml = '';
+  if (noData) {
+    chartHtml = `<div style="padding:24px;text-align:center;color:var(--cream-dim);font-size:12px">Need more games to show trend</div>`;
+  } else {
+    const yMin = _trendMetric === 'avgbid' ? 1 : 0;
+    const yMax = _trendMetric === 'avgbid' ? 7 : 1;
+    chartHtml = `<div class="trend-chart-wrap">${makeTrendSVG(chartData, yMin, yMax, mc.color, mc.fmtY)}</div>`;
+  }
+
+  // Current value callout
+  const lastValid = mc.series.filter(v => v !== null);
+  const curVal = lastValid.length ? mc.fmt(lastValid[lastValid.length - 1]) : '—';
+  const firstVal = lastValid.length ? mc.fmt(lastValid[0]) : '—';
+
+  // Trend arrow: compare first half avg vs second half avg
+  let trendArrow = '';
+  if (lastValid.length >= 4) {
+    const mid = Math.floor(lastValid.length / 2);
+    const firstHalf = lastValid.slice(0, mid).reduce((a,b)=>a+b,0)/mid;
+    const secondHalf = lastValid.slice(mid).reduce((a,b)=>a+b,0)/(lastValid.length-mid);
+    const diff = secondHalf - firstHalf;
+    const improving = _trendMetric === 'setrate' ? diff < 0 : diff > 0;
+    const neutral = Math.abs(diff) < 0.02;
+    trendArrow = neutral ? '<span style="color:var(--cream-dim)">→ Stable</span>'
+      : improving ? '<span style="color:var(--teal)">↑ Improving</span>'
+      : '<span style="color:var(--red-bright)">↓ Declining</span>';
+  }
+
+  // Mini sparkline summary row
+  const allMetricKeys = ['winrate','pba','avgbid','setrate','bidrate'];
+  const sparkCells = allMetricKeys.map(key => {
+    const mc2 = metrics[key];
+    const sd = mc2.series.filter(v => v !== null);
+    const cur = sd.length ? mc2.fmt(sd[sd.length-1]) : '—';
+    const spark = sd.length >= 2 ? makeSparkSVG(sd, mc2.color) : '';
+    return `<div class="trend-spark-cell" onclick="selectTrendMetric('${key}')" style="cursor:pointer${_trendMetric===key?';border-color:var(--gold)':''}">
+      <div class="trend-spark-label">${mc2.label}</div>
+      <div class="trend-spark-val">${cur}</div>
+      ${spark}
+    </div>`;
+  });
+
+  // Summary stats
+  const finalWR = seriesWR.length ? seriesWR[seriesWR.length-1] : null;
+  const finalPBA = seriesPBA.filter(v=>v!==null);
+  const finalAB = seriesAB.filter(v=>v!==null);
+
+  let html = pickerHtml + chartHtml;
+  html += `<div class="trend-section">`;
+  html += `<div class="trend-section-title">${mc.label} · ${G} games</div>`;
+  html += `<div class="trend-stat-row"><span class="trend-stat-label">Current value</span><span class="trend-stat-val">${curVal}</span></div>`;
+  html += `<div class="trend-stat-row"><span class="trend-stat-label">First game</span><span class="trend-stat-val">${firstVal}</span></div>`;
+  if (trendArrow) html += `<div class="trend-stat-row"><span class="trend-stat-label">Trajectory</span><span class="trend-stat-val">${trendArrow}</span></div>`;
+  html += `<div class="trend-section-title" style="margin-top:20px">All metrics at a glance</div>`;
+  html += `<div class="trend-sparkrow">${sparkCells.join('')}</div>`;
+  html += `</div>`;
+
+  body.innerHTML = html;
+}
+
 function renderInsights() {
   const player = _insightsPlayer;
   if (!player) return;
@@ -3539,6 +3785,7 @@ function renderInsights() {
   // Dispatch to the active tab renderer
   if (_insightsTab === 'advanced') { renderInsightsAdvanced(player, games, allGames); return; }
   if (_insightsTab === 'card')     { renderInsightsCard(player, games, allGames); return; }
+  if (_insightsTab === 'trend')    { renderInsightsTrend(player, games, allGames); return; }
 
   // ── Section 1: Core Bidding ─────────────────────────
   const bidGames = games.filter(g => g.bidder === player && !g.kamikaze);
