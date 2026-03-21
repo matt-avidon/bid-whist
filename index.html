@@ -2619,7 +2619,7 @@ function renderPlay() {
   updatePreview();
 
   // Games this session (current rotation only)
-  const rotGames = s.games.filter(g => g.rotIdx === rotN);
+  const rotGames = s.games.filter(g => g.rotIdx === s.rotationIdx);
   document.getElementById('game-count').textContent = rotGames.length;
   document.getElementById('btn-undo').style.display = s.games.length ? '' : 'none';
 
