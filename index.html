@@ -294,6 +294,52 @@ body {
 .money-progress-fill.pos { background: var(--green-bright); }
 .money-progress-fill.neg { background: var(--red-bright); }
 
+/* ── Money team layout ── */
+.money-teams {
+  display: flex;
+  gap: 0;
+  width: 100%;
+}
+.money-team-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.money-team-divider {
+  width: 1px;
+  background: var(--border);
+  margin: 0 10px;
+  flex-shrink: 0;
+}
+.money-team-label {
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.team-a-label { color: var(--gold-dim); }
+.team-b-label { color: var(--teal); }
+.money-player-card {
+  padding: 6px 0;
+}
+.money-player-card .money-name {
+  font-size: 13px;
+  font-weight: 500;
+  flex: none;
+  margin-bottom: 1px;
+}
+.money-player-card .money-amt {
+  font-family: 'Playfair Display', serif;
+  font-size: 17px;
+  min-width: unset;
+  text-align: left;
+  line-height: 1.2;
+}
+
 /* ── Step label with completion state ── */
 .log-step {
   margin-bottom: 16px;
@@ -1153,7 +1199,9 @@ let S = {
   players: ['Matt','Juan','Rohin','Jackson'],
   cfg: { pts:9, target:20, win:5, boston:3, cam:1, set:2, blitz:1.5, kw:2, kl:2 },
   session: null,
-  allSessions: []
+  allSessions: [],
+  allTimeStats: {},
+  allTimeMoney: {}
 };
 
 function load() {
@@ -1163,6 +1211,8 @@ function load() {
       S = JSON.parse(d);
       if (S.session && !Array.isArray(S.session.games)) S.session.games = [];
       if (!Array.isArray(S.allSessions)) S.allSessions = [];
+      if (!S.allTimeStats || typeof S.allTimeStats !== 'object') S.allTimeStats = {};
+      if (!S.allTimeMoney || typeof S.allTimeMoney !== 'object') S.allTimeMoney = {};
     }
   } catch(e) {}
 }
@@ -1657,30 +1707,39 @@ function renderPlay() {
       <div class="score-pips">${pips(s.scoreB, cfg.pts, 'b')}</div>
     </div>`;
 
-  // Money
+  // Money — team-based layout
   const target = cfg.target;
-  const sorted = S.players.slice().sort((a,b)=>(s.money[b]||0)-(s.money[a]||0));
-  document.getElementById('money-rows').innerHTML = sorted.map((p,i) => {
+  const teamAPlayers = [rot[0], rot[1]];
+  const teamBPlayers = [rot[2], rot[3]];
+  function moneyPlayerHTML(p) {
     const m = s.money[p]||0;
     const ps = s.pStats[p]||{};
     const bp = ps.bids ? `${Math.round(ps.bidsMade/ps.bids*100)}%` : '—';
     const cls = m>0?'pos':m<0?'neg':'zero';
-    const pct = Math.max(0, Math.min(100, (m / target) * 100));
+    const pct = Math.max(0, Math.min(100, Math.abs(m) / Math.max(1, target) * 100));
     const barCls = m >= 0 ? 'pos' : 'neg';
-    return `<div class="money-row">
-      <div class="money-rank">${i+1}</div>
-      <div style="flex:1;min-width:0">
-        <div class="money-name">${p}</div>
-        <div class="money-progress-wrap"><div class="money-progress-fill ${barCls}" style="width:${pct}%"></div></div>
-        <div class="money-stats" style="margin-top:3px">
-          <span class="money-stat">${ps.wins||0}W/${ps.losses||0}L</span>
-          <span class="money-stat">${ps.sets||0} sets</span>
-          <span class="money-stat">Bid ${bp}</span>
-        </div>
-      </div>
+    return `<div class="money-player-card">
+      <div class="money-name">${p}</div>
       <div class="money-amt ${cls}">$${m.toFixed(2)}</div>
+      <div class="money-progress-wrap" style="margin:3px 0"><div class="money-progress-fill ${barCls}" style="width:${pct}%"></div></div>
+      <div class="money-stats">
+        <span class="money-stat">${ps.wins||0}W/${ps.losses||0}L</span>
+        <span class="money-stat">Bid ${bp}</span>
+      </div>
     </div>`;
-  }).join('');
+  }
+  document.getElementById('money-rows').innerHTML = `
+    <div class="money-teams">
+      <div class="money-team-col">
+        <div class="money-team-label team-a-label">Team A</div>
+        ${teamAPlayers.map(moneyPlayerHTML).join('')}
+      </div>
+      <div class="money-team-divider"></div>
+      <div class="money-team-col">
+        <div class="money-team-label team-b-label">Team B</div>
+        ${teamBPlayers.map(moneyPlayerHTML).join('')}
+      </div>
+    </div>`;
 
   // Team toggle
   document.getElementById('team-toggle').innerHTML = `
@@ -1783,16 +1842,34 @@ function renderHistory() {
 
 // ── Render Stats ───────────────────────────────────
 function renderStats() {
-  if (!S.session || !S.session.games.length) {
+  // Build combined all-time stats: persisted allTime + current session (not yet merged)
+  const combinedStats = {};
+  const combinedMoney = {};
+  const statKeys = ['wins','losses','sets','bostons','cams','bids','bidsMade','kamA','kamM'];
+  S.players.forEach(p => {
+    combinedStats[p] = {wins:0,losses:0,sets:0,bostons:0,cams:0,bids:0,bidsMade:0,kamA:0,kamM:0};
+    statKeys.forEach(k => { combinedStats[p][k] = (S.allTimeStats[p]?.[k]||0); });
+    combinedMoney[p] = S.allTimeMoney[p]||0;
+    if (S.session) {
+      const st = S.session.pStats[p]||{};
+      statKeys.forEach(k => { combinedStats[p][k] += (st[k]||0); });
+      combinedMoney[p] += (S.session.money[p]||0);
+    }
+  });
+
+  const hasAnyData = S.players.some(p => {
+    const st = combinedStats[p];
+    return (st.wins||0)+(st.losses||0)+(st.bids||0) > 0;
+  });
+  if (!hasAnyData) {
     document.getElementById('stats-content').innerHTML = '<div class="empty"><div class="empty-icon">♥</div><div class="empty-title">No stats yet</div></div>';
     return;
   }
-  const s = S.session;
-  const ps = s.pStats;
+
   let html = '<div class="stat-grid">';
   S.players.forEach(p => {
-    const st = ps[p]||{};
-    const m = s.money[p]||0;
+    const st = combinedStats[p];
+    const m = combinedMoney[p];
     const total = (st.wins||0)+(st.losses||0);
     const wr = total ? Math.round(st.wins/total*100)+'%' : '—';
     const bp = st.bids ? Math.round(st.bidsMade/st.bids*100)+'%' : '—';
@@ -1800,7 +1877,7 @@ function renderStats() {
     const mCls = m>=0?'color:var(--green-bright)':'color:var(--red-bright)';
     html += `<div class="stat-card">
       <div class="stat-player">${p}</div>
-      <div class="stat-row"><span class="stat-key">Money</span><span class="stat-val" style="${mCls}">$${m.toFixed(2)}</span></div>
+      <div class="stat-row"><span class="stat-key">All-time $</span><span class="stat-val" style="${mCls}">$${m.toFixed(2)}</span></div>
       <div class="stat-row"><span class="stat-key">Win rate</span><span class="stat-val">${wr}</span></div>
       <div class="stat-row"><span class="stat-key">W / L</span><span class="stat-val">${st.wins||0} / ${st.losses||0}</span></div>
       <div class="stat-row"><span class="stat-key">Sets taken</span><span class="stat-val" style="${(st.sets||0)>0?'color:var(--red-bright)':''}">${st.sets||0}</span></div>
@@ -1813,8 +1890,10 @@ function renderStats() {
   });
   html += '</div>';
 
+  // Partnership records across all sessions + current session
   const pairs = {};
-  s.games.forEach(g => {
+  const allGames = [...(S.allSessions||[]).flatMap(sess => sess.games||[]), ...(S.session?.games||[])];
+  allGames.forEach(g => {
     [[g.teamA,g.bidTeam==='A'],[g.teamB,g.bidTeam==='B']].forEach(([team,isBidTeam]) => {
       if (!team) return;
       const key = team.slice().sort().join(' & ');
@@ -1826,16 +1905,18 @@ function renderStats() {
       pairs[key].net += (g.delta[p0]||0);
     });
   });
-  html += `<div class="card"><div class="card-title">Partnership records</div>
-  <table class="games-table"><thead><tr><th>Partners</th><th>Games</th><th>W</th><th>L</th><th>Net $</th></tr></thead><tbody>`;
-  Object.entries(pairs).sort((a,b)=>b[1].net-a[1].net).forEach(([pair,st]) => {
-    const nc = st.net>=0?'color:var(--green-bright)':'color:var(--red-bright)';
-    html += `<tr><td class="em">${pair}</td><td>${st.games}</td>
-      <td style="color:var(--green-bright)">${st.wins}</td>
-      <td style="color:var(--red-bright)">${st.losses}</td>
-      <td style="${nc}">$${st.net.toFixed(2)}</td></tr>`;
-  });
-  html += '</tbody></table></div>';
+  if (Object.keys(pairs).length) {
+    html += `<div class="card"><div class="card-title">Partnership records (all-time)</div>
+    <table class="games-table"><thead><tr><th>Partners</th><th>Games</th><th>W</th><th>L</th><th>Net $</th></tr></thead><tbody>`;
+    Object.entries(pairs).sort((a,b)=>b[1].net-a[1].net).forEach(([pair,st]) => {
+      const nc = st.net>=0?'color:var(--green-bright)':'color:var(--red-bright)';
+      html += `<tr><td class="em">${pair}</td><td>${st.games}</td>
+        <td style="color:var(--green-bright)">${st.wins}</td>
+        <td style="color:var(--red-bright)">${st.losses}</td>
+        <td style="${nc}">$${st.net.toFixed(2)}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
 
   document.getElementById('stats-content').innerHTML = html;
 }
@@ -1910,10 +1991,23 @@ function importData() {
   inp.click();
 }
 
+function mergeIntoAllTime() {
+  if (!S.session) return;
+  const statKeys = ['wins','losses','sets','bostons','cams','bids','bidsMade','kamA','kamM'];
+  S.players.forEach(p => {
+    if (!S.allTimeStats[p]) S.allTimeStats[p] = {wins:0,losses:0,sets:0,bostons:0,cams:0,bids:0,bidsMade:0,kamA:0,kamM:0};
+    const st = S.session.pStats[p] || {};
+    statKeys.forEach(k => { S.allTimeStats[p][k] = (S.allTimeStats[p][k]||0) + (st[k]||0); });
+    if (!S.allTimeMoney[p]) S.allTimeMoney[p] = 0;
+    S.allTimeMoney[p] += (S.session.money[p]||0);
+  });
+}
+
 function startSession() {
   if (S.players.length < 4) return alert('Need at least 4 players.');
   if (S.session && S.session.games && S.session.games.length > 0) {
     if (!confirm('Starting a new session will end the current one. Continue?')) return;
+    mergeIntoAllTime();
   }
   const g = id => parseFloat(document.getElementById(id).value);
   const cfg = { pts:g('cfg-pts'), target:g('cfg-target'), win:g('cfg-win'), boston:g('cfg-boston'), cam:g('cfg-cam'), set:g('cfg-set'), blitz:g('cfg-blitz'), kw:g('cfg-kw'), kl:g('cfg-kl') };
@@ -1928,7 +2022,7 @@ function startSession() {
 
 function resetAll() {
   if (!confirm('Clear all data?')) return;
-  S.session=null; S.allSessions=[];
+  S.session=null; S.allSessions=[]; S.allTimeStats={}; S.allTimeMoney={};
   save(); nav('setup');
 }
 
@@ -1943,6 +2037,8 @@ function applyRemoteData(data) {
   // Ensure session always has a games array (guards against corrupted data)
   if (data.session && !Array.isArray(data.session.games)) data.session.games = [];
   if (!Array.isArray(data.allSessions)) data.allSessions = [];
+  if (!data.allTimeStats || typeof data.allTimeStats !== 'object') data.allTimeStats = {};
+  if (!data.allTimeMoney || typeof data.allTimeMoney !== 'object') data.allTimeMoney = {};
   S = data;
   localStorage.setItem('whist4', JSON.stringify(S));
   const active = document.querySelector('.view.active');
