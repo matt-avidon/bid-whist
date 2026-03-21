@@ -237,8 +237,13 @@ body {
   text-transform: uppercase;
   padding: 2px 7px;
   border-radius: 20px;
-  margin-top: 6px;
   font-family: 'DM Mono', monospace;
+}
+/* Fixed-height slot so the blitz pill never stretches the score box */
+.blitz-badge-row {
+  height: 20px;
+  display: flex; align-items: center;
+  margin-top: 5px;
 }
 
 /* ── Money Table ── */
@@ -2453,8 +2458,7 @@ function renderPlay() {
   // Score panels
   function pips(score, target, team) {
     if (score < 0) {
-      return Array.from({length:Math.abs(score)},()=>`<div class="pip neg"></div>`).join('') +
-        `<span class="blitz-tag">Blitz</span>`;
+      return Array.from({length:Math.abs(score)},()=>`<div class="pip neg"></div>`).join('');
     }
     const cls = team==='a' ? 'on-a' : 'on-b';
     return Array.from({length:target},(_, i)=>`<div class="pip ${i<score?cls:''}"></div>`).join('');
@@ -2470,6 +2474,7 @@ function renderPlay() {
       <div class="score-target">of ${cfg.pts} pts</div>
       <div class="score-bar-wrap"><div class="score-bar-fill" style="width:${pctA}%"></div></div>
       <div class="score-pips">${pips(s.scoreA, cfg.pts, 'a')}</div>
+      <div class="blitz-badge-row">${blitzA?'<span class="blitz-tag">Blitz</span>':''}</div>
     </div>
     <div class="score-panel team-b ${blitzB?'blitz':s.scoreB>=cfg.pts?'winner':''}">
       <div class="score-team-label">Team B</div>
@@ -2478,6 +2483,7 @@ function renderPlay() {
       <div class="score-target">of ${cfg.pts} pts</div>
       <div class="score-bar-wrap"><div class="score-bar-fill" style="width:${pctB}%"></div></div>
       <div class="score-pips">${pips(s.scoreB, cfg.pts, 'b')}</div>
+      <div class="blitz-badge-row">${blitzB?'<span class="blitz-tag">Blitz</span>':''}</div>
     </div>`;
 
   // Sticky score bar
