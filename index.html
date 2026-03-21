@@ -1140,8 +1140,13 @@ const firebaseConfig = {
   messagingSenderId: "13653997017",
   appId: "1:13653997017:web:fdbf39213412b31cb955c8"
 };
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+let db = null;
+try {
+  if (typeof firebase !== 'undefined') {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+  }
+} catch(e) { console.warn('Firebase unavailable:', e); }
 
 // ── State ────────────────────────────────────────────
 let S = {
@@ -1156,6 +1161,7 @@ function load() { try { const d=localStorage.getItem('whist4'); if(d) S=JSON.par
 let _saveTimer = null;
 function save() {
   localStorage.setItem('whist4', JSON.stringify(S));
+  if (!db) return;
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => {
     db.ref('whist').set(S).catch(err => console.error('Firebase save error:', err));
@@ -1268,20 +1274,27 @@ function renderHandsGrid() {
   const madeContainer = document.getElementById('hands-made-btns');
   if (!setContainer || !madeContainer) return;
 
-  // Set zone: 0–6
-  setContainer.innerHTML = Array.from({length:7},(_,i) => btnHtml(i)).join('');
-  // Made zone: 7–13
-  madeContainer.innerHTML = Array.from({length:7},(_,i) => btnHtml(i+7)).join('');
+  // Set zone: 0 to minMade-1 (dynamically sized based on bid)
+  const setCount = minMade;
+  const madeCount = 14 - minMade;
+  setContainer.innerHTML = Array.from({length:setCount},(_,i) => btnHtml(i)).join('');
+  setContainer.style.gridTemplateColumns = `repeat(${setCount}, 1fr)`;
+  madeContainer.innerHTML = Array.from({length:madeCount},(_,i) => btnHtml(i + minMade)).join('');
+  madeContainer.style.gridTemplateColumns = `repeat(${madeCount}, 1fr)`;
 
-  // Update zone labels to reflect current bid threshold
+  // Update zone flex widths to move the divider
+  const setZoneEl = setContainer.closest('.hands-zone');
+  const madeZoneEl = madeContainer.closest('.hands-zone');
+  if (setZoneEl) setZoneEl.style.flex = setCount;
+  if (madeZoneEl) madeZoneEl.style.flex = madeCount;
+
+  // Update zone labels
+  const setLabel = document.querySelector('.set-zone .hands-zone-label');
+  const madeLabel = document.querySelector('.made-zone .hands-zone-label');
   if (fBid !== null) {
-    const setLabel = document.querySelector('.set-zone .hands-zone-label');
-    const madeLabel = document.querySelector('.made-zone .hands-zone-label');
-    if (setLabel) setLabel.textContent = `Set (need ${minMade}+)`;
+    if (setLabel) setLabel.textContent = `Set (0–${minMade - 1})`;
     if (madeLabel) madeLabel.textContent = `Made (${minMade}–13)`;
   } else {
-    const setLabel = document.querySelector('.set-zone .hands-zone-label');
-    const madeLabel = document.querySelector('.made-zone .hands-zone-label');
     if (setLabel) setLabel.textContent = 'Set (0–6)';
     if (madeLabel) madeLabel.textContent = 'Made (7–13)';
   }
@@ -1932,34 +1945,30 @@ function setLive() {
   if (el) { el.textContent = '⬤ live'; el.style.color = 'var(--teal)'; }
 }
 
-// Initial load — fast one-time read to populate data and show live immediately
-db.ref('whist').once('value')
-  .then(snap => { setLive(); applyRemoteData(snap.val()); })
-  .catch(() => {});
+if (db) {
+  // Initial fast read — loads data and shows live indicator immediately
+  db.ref('whist').once('value')
+    .then(snap => { setLive(); applyRemoteData(snap.val()); })
+    .catch(() => {});
 
-// Real-time listener — keeps all users in sync after initial load
-db.ref('whist').on('value', snapshot => {
-  setLive();
-  applyRemoteData(snapshot.val());
-});
+  // Real-time listener — keeps all users in sync
+  db.ref('whist').on('value', snapshot => {
+    setLive();
+    applyRemoteData(snapshot.val());
+  });
 
-// Mark offline if WebSocket drops
-db.ref('.info/connected').on('value', snap => {
-  if (snap.val() === false) {
-    const el = document.getElementById('conn-indicator');
-    if (el) { el.textContent = '⬤ offline'; el.style.color = 'var(--red-bright)'; }
-  }
-});
-
-// Fallback: if still showing "connecting" after 2s, retry with a direct read
-setTimeout(() => {
+  // Mark offline if connection drops
+  db.ref('.info/connected').on('value', snap => {
+    if (snap.val() === false) {
+      const el = document.getElementById('conn-indicator');
+      if (el) { el.textContent = '⬤ offline'; el.style.color = 'var(--red-bright)'; }
+    }
+  });
+} else {
+  // Firebase unavailable (e.g. content blocker) — app works with local storage only
   const el = document.getElementById('conn-indicator');
-  if (el && el.textContent.includes('connecting')) {
-    db.ref('whist').once('value')
-      .then(snap => { setLive(); applyRemoteData(snap.val()); })
-      .catch(() => {});
-  }
-}, 2000);
+  if (el) { el.textContent = '⬤ local'; el.style.color = 'var(--amber)'; }
+}
 </script>
 </body>
 </html>
