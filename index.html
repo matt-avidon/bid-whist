@@ -938,18 +938,71 @@ body {
 .empty-title { font-size: 15px; font-weight: 500; color: var(--cream); margin-bottom: 6px; }
 .empty-sub { font-size: 13px; }
 
-/* ── Session end banner ── */
-.session-banner {
-  background: linear-gradient(135deg, rgba(201,168,76,0.2), rgba(201,168,76,0.05));
-  border: 1px solid var(--gold);
-  border-radius: var(--radius);
-  padding: 16px 18px;
-  margin-bottom: 14px;
-  display: none;
+/* ── Win popup ── */
+.win-popup {
+  position: fixed; inset: 0; z-index: 400;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 56px) 20px 0;
+  pointer-events: none;
+  opacity: 0; transition: opacity 0.25s ease;
 }
-.session-banner.show { display: block; }
-.session-banner-title { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--gold-pale); margin-bottom: 4px; }
-.session-banner-sub { font-size: 12px; color: var(--cream-dim); }
+.win-popup.show { opacity: 1; pointer-events: auto; }
+.win-popup-card {
+  width: 100%; max-width: 400px;
+  background: linear-gradient(150deg, rgba(28,44,30,0.98) 0%, rgba(22,38,26,0.98) 100%);
+  border: 1px solid var(--gold);
+  border-radius: 18px;
+  padding: 22px 22px 18px;
+  box-shadow: 0 16px 60px rgba(0,0,0,0.65), 0 0 0 1px rgba(201,168,76,0.12);
+  transform: translateY(-28px) scale(0.93);
+  transition: transform 0.42s cubic-bezier(0.34, 1.45, 0.64, 1);
+  text-align: center; cursor: pointer;
+}
+.win-popup.show .win-popup-card { transform: translateY(0) scale(1); }
+.win-popup-icon { font-size: 30px; margin-bottom: 8px; line-height: 1; }
+.win-popup-title {
+  font-family: 'Playfair Display', serif; font-size: 21px;
+  color: var(--gold-pale); margin-bottom: 6px; line-height: 1.25;
+}
+.win-popup-payout {
+  font-family: 'Playfair Display', serif; font-size: 38px;
+  color: var(--green-bright); line-height: 1; margin-bottom: 8px;
+}
+.win-popup-sub { font-size: 12px; color: var(--cream-dim); margin-bottom: 14px; line-height: 1.5; }
+.win-popup-bar-wrap {
+  height: 3px; background: rgba(201,168,76,0.18);
+  border-radius: 2px; overflow: hidden;
+}
+.win-popup-bar {
+  height: 100%; background: var(--gold); border-radius: 2px;
+  transform-origin: left; transform: scaleX(1);
+}
+@keyframes shrinkBar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* ── Stats filter ── */
+.stats-filter-row {
+  display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.stats-filter-btn {
+  background: var(--felt-lighter); border: 1px solid var(--border);
+  border-radius: 20px; color: var(--cream-dim);
+  font-size: 11px; font-family: 'DM Mono', monospace;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 6px 14px; cursor: pointer;
+  transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+}
+.stats-filter-btn.active {
+  background: var(--gold); border-color: var(--gold);
+  color: var(--felt); font-weight: 600;
+}
+
+/* ── Scrollable partnership table ── */
+.partner-scroll-wrap {
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-sm);
+}
+.partner-table { min-width: 560px; }
+.partner-table th, .partner-table td { white-space: nowrap; }
 
 /* ── Rotation info ── */
 .rotation-info {
@@ -1068,11 +1121,6 @@ body { -webkit-text-size-adjust: 100%; }
 
     <div id="play-main" style="display:none">
 
-      <div class="session-banner" id="session-banner">
-        <div class="session-banner-title" id="session-banner-title">Session over!</div>
-        <div class="session-banner-sub" id="session-banner-sub"></div>
-      </div>
-
       <div class="rotation-info" id="rotation-info">
         <span>Rotation <span class="rot-num" id="rot-label"></span></span>
         <span id="rot-teams-label"></span>
@@ -1182,6 +1230,11 @@ body { -webkit-text-size-adjust: 100%; }
 
   <!-- ── STATS ── -->
   <div class="view" id="view-stats">
+    <div class="stats-filter-row">
+      <button class="stats-filter-btn active" data-filter="all" onclick="setStatsFilter('all')">All-time</button>
+      <button class="stats-filter-btn" data-filter="year" onclick="setStatsFilter('year')">This year</button>
+      <button class="stats-filter-btn" data-filter="month" onclick="setStatsFilter('month')">This month</button>
+    </div>
     <div id="stats-content"><div class="empty"><div class="empty-icon">♥</div><div class="empty-title">No stats yet</div></div></div>
   </div>
 
@@ -1222,6 +1275,17 @@ body { -webkit-text-size-adjust: 100%; }
     <button class="btn-danger" onclick="resetAll()">Reset all data</button>
   </div>
 
+</div>
+
+<!-- Win popup -->
+<div class="win-popup" id="win-popup" onclick="dismissWinPopup()">
+  <div class="win-popup-card">
+    <div class="win-popup-icon" id="win-popup-icon">♠</div>
+    <div class="win-popup-title" id="win-popup-title"></div>
+    <div class="win-popup-payout" id="win-popup-payout"></div>
+    <div class="win-popup-sub" id="win-popup-sub"></div>
+    <div class="win-popup-bar-wrap"><div class="win-popup-bar" id="win-popup-bar"></div></div>
+  </div>
 </div>
 
 <!-- Sticky score bar (play tab) -->
@@ -1291,6 +1355,35 @@ let fBidTeam = null, fBidder = null, fBid = null, fHands = null, fKam = false, f
 
 // sticky score observer
 let _stickyObs = null;
+
+// stats date filter
+let statsFilter = 'all';
+function setStatsFilter(f) {
+  statsFilter = f;
+  document.querySelectorAll('.stats-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === f));
+  renderStats();
+}
+
+// win popup
+let _winPopupTimer = null;
+function showWinPopup(icon, title, payout, sub) {
+  const popup = document.getElementById('win-popup');
+  document.getElementById('win-popup-icon').textContent = icon;
+  document.getElementById('win-popup-title').textContent = title;
+  document.getElementById('win-popup-payout').textContent = payout;
+  document.getElementById('win-popup-sub').textContent = sub;
+  const bar = document.getElementById('win-popup-bar');
+  bar.style.animation = 'none';
+  bar.offsetHeight; // force reflow to restart animation
+  bar.style.animation = 'shrinkBar 6s linear forwards';
+  popup.classList.add('show');
+  clearTimeout(_winPopupTimer);
+  _winPopupTimer = setTimeout(dismissWinPopup, 6200);
+}
+function dismissWinPopup() {
+  clearTimeout(_winPopupTimer);
+  document.getElementById('win-popup').classList.remove('show');
+}
 
 // ── Rotations ──────────────────────────────────────
 function getRots(ps) {
@@ -1660,16 +1753,15 @@ function logGame() {
 
     // Rotate teams only when winning team both hit $20 target
     const teamHit20 = winTeamPlayers.every(p => (s.money[p]||0) >= cfg.target);
-    document.getElementById('session-banner').classList.add('show');
     if (teamHit20) {
-      document.getElementById('session-banner-title').textContent = `${winTeam} reach $${cfg.target}!`;
-      document.getElementById('session-banner-sub').textContent =
-        `$${winPay.toFixed(2)} payout${losingInBlitz?' (blitz)':''}. Starting new rotation — teams change!`;
+      showWinPopup('🏆', `${winTeam} reach $${cfg.target}!`,
+        `+$${winPay.toFixed(2)}${losingInBlitz?' (blitz)':''}`,
+        'Teams change — starting new rotation');
       s.rotationIdx++;
     } else {
-      document.getElementById('session-banner-title').textContent = `${winTeam} win!`;
-      document.getElementById('session-banner-sub').textContent =
-        `$${winPay.toFixed(2)} payout${losingInBlitz?' (blitz)':''}. Same teams — play to ${cfg.pts} again.`;
+      showWinPopup('♠', `${winTeam} win!`,
+        `+$${winPay.toFixed(2)}${losingInBlitz?' (blitz)':''}`,
+        `Same teams — play to ${cfg.pts} again`);
     }
 
     s.scoreA = 0; s.scoreB = 0;
@@ -1738,7 +1830,7 @@ function undoLastGame() {
     if (s.rotationIdx > 0) s.rotationIdx--;
   }
 
-  document.getElementById('session-banner').classList.remove('show');
+  dismissWinPopup();
   save();
   renderPlay();
 }
@@ -1944,33 +2036,76 @@ function renderHistory() {
 
 // ── Render Stats ───────────────────────────────────
 function renderStats() {
-  // Build combined all-time stats: persisted allTime + current session (not yet merged)
-  const combinedStats = {};
+  // All games across all sessions + current
+  const allGames = [...(S.allSessions||[]).flatMap(s => s.games||[]), ...(S.session?.games||[])];
+
+  // Date filter
+  function filterByDate(games) {
+    if (statsFilter === 'all') return games;
+    const now = new Date(), y = now.getFullYear(), mo = now.getMonth();
+    return games.filter(g => {
+      if (!g.ts) return true;
+      const d = new Date(g.ts);
+      if (statsFilter === 'year') return d.getFullYear() === y;
+      if (statsFilter === 'month') return d.getFullYear() === y && d.getMonth() === mo;
+      return true;
+    });
+  }
+  const filteredGames = filterByDate(allGames);
+
+  // Compute player stats from filtered game records
+  function computePlayerStats(games) {
+    const ps = {};
+    S.players.forEach(p => { ps[p] = {wins:0,losses:0,sets:0,bostons:0,cams:0,bids:0,bidsMade:0,kamA:0,kamM:0}; });
+    games.forEach(g => {
+      const bidTeam = g.bidTeam==='A' ? g.teamA : g.teamB;
+      const defTeam = g.bidTeam==='A' ? g.teamB : g.teamA;
+      if (!bidTeam || !defTeam) return;
+      if (!g.kamikaze) {
+        if (g.madeIt) {
+          bidTeam.forEach(p => { if(ps[p]){ps[p].wins++;if(g.boston)ps[p].bostons++;if(g.cambridge)ps[p].cams++;} });
+          defTeam.forEach(p => { if(ps[p]) ps[p].losses++; });
+        } else {
+          bidTeam.forEach(p => { if(ps[p]){ps[p].losses++;ps[p].sets++;} });
+          defTeam.forEach(p => { if(ps[p]) ps[p].wins++; });
+        }
+      } else {
+        bidTeam.forEach(p => { if(ps[p]) ps[p].kamA++; });
+        if (g.kamOutcome==='made') {
+          bidTeam.forEach(p => { if(ps[p]){ps[p].wins++;ps[p].kamM++;} });
+          defTeam.forEach(p => { if(ps[p]) ps[p].losses++; });
+        } else {
+          bidTeam.forEach(p => { if(ps[p]){ps[p].losses++;ps[p].sets++;} });
+          defTeam.forEach(p => { if(ps[p]) ps[p].wins++; });
+        }
+      }
+      if (g.bidder && ps[g.bidder]) {
+        ps[g.bidder].bids++;
+        if (g.madeIt && !g.kamikaze) ps[g.bidder].bidsMade++;
+      }
+    });
+    return ps;
+  }
+
+  const gameStats = computePlayerStats(filteredGames);
+
+  // All-time money always uses cumulative (session-end payouts aren't per-game)
   const combinedMoney = {};
-  const statKeys = ['wins','losses','sets','bostons','cams','bids','bidsMade','kamA','kamM'];
   S.players.forEach(p => {
-    combinedStats[p] = {wins:0,losses:0,sets:0,bostons:0,cams:0,bids:0,bidsMade:0,kamA:0,kamM:0};
-    statKeys.forEach(k => { combinedStats[p][k] = (S.allTimeStats[p]?.[k]||0); });
-    combinedMoney[p] = S.allTimeMoney[p]||0;
-    if (S.session) {
-      const st = S.session.pStats[p]||{};
-      statKeys.forEach(k => { combinedStats[p][k] += (st[k]||0); });
-      combinedMoney[p] += (S.session.money[p]||0);
-    }
+    combinedMoney[p] = (S.allTimeMoney[p]||0) + (S.session?.money[p]||0);
   });
 
-  const hasAnyData = S.players.some(p => {
-    const st = combinedStats[p];
-    return (st.wins||0)+(st.losses||0)+(st.bids||0) > 0;
-  });
+  const hasAnyData = filteredGames.length > 0 || S.players.some(p => combinedMoney[p] !== 0);
   if (!hasAnyData) {
     document.getElementById('stats-content').innerHTML = '<div class="empty"><div class="empty-icon">♥</div><div class="empty-title">No stats yet</div></div>';
     return;
   }
 
+  const filterLabel = statsFilter === 'month' ? 'this month' : statsFilter === 'year' ? 'this year' : 'all-time';
+
   let html = '<div class="stat-grid">';
   S.players.forEach(p => {
-    const st = combinedStats[p];
+    const st = gameStats[p];
     const m = combinedMoney[p];
     const total = (st.wins||0)+(st.losses||0);
     const wr = total ? Math.round(st.wins/total*100)+'%' : '—';
@@ -1979,7 +2114,7 @@ function renderStats() {
     const mCls = m>=0?'color:var(--green-bright)':'color:var(--red-bright)';
     html += `<div class="stat-card">
       <div class="stat-player">${p}</div>
-      <div class="stat-row"><span class="stat-key">All-time $</span><span class="stat-val" style="${mCls}">$${m.toFixed(2)}</span></div>
+      <div class="stat-row"><span class="stat-key">Money (all-time)</span><span class="stat-val" style="${mCls}">$${m.toFixed(2)}</span></div>
       <div class="stat-row"><span class="stat-key">Win rate</span><span class="stat-val">${wr}</span></div>
       <div class="stat-row"><span class="stat-key">W / L</span><span class="stat-val">${st.wins||0} / ${st.losses||0}</span></div>
       <div class="stat-row"><span class="stat-key">Sets taken</span><span class="stat-val" style="${(st.sets||0)>0?'color:var(--red-bright)':''}">${st.sets||0}</span></div>
@@ -1992,32 +2127,51 @@ function renderStats() {
   });
   html += '</div>';
 
-  // Partnership records across all sessions + current session
+  // Partnership stats from filtered games
   const pairs = {};
-  const allGames = [...(S.allSessions||[]).flatMap(sess => sess.games||[]), ...(S.session?.games||[])];
-  allGames.forEach(g => {
-    [[g.teamA,g.bidTeam==='A'],[g.teamB,g.bidTeam==='B']].forEach(([team,isBidTeam]) => {
+  filteredGames.forEach(g => {
+    [[g.teamA, g.bidTeam==='A'], [g.teamB, g.bidTeam==='B']].forEach(([team, isBidTeam]) => {
       if (!team) return;
       const key = team.slice().sort().join(' & ');
-      if (!pairs[key]) pairs[key] = {games:0,wins:0,losses:0,net:0};
+      if (!pairs[key]) pairs[key] = {games:0,wins:0,losses:0,net:0,bids:0,bidsMade:0,sets:0,bostons:0,cams:0,blitz:0};
       pairs[key].games++;
       const won = isBidTeam ? g.madeIt : !g.madeIt;
       if (won) pairs[key].wins++; else pairs[key].losses++;
-      const p0 = team[0];
-      pairs[key].net += (g.delta[p0]||0);
+      pairs[key].net += (g.delta?.[team[0]]||0);
+      if (isBidTeam) {
+        pairs[key].bids++;
+        if (g.madeIt) { pairs[key].bidsMade++; if(g.boston) pairs[key].bostons++; if(g.cambridge) pairs[key].cams++; }
+        else pairs[key].sets++;
+      }
+      if (g.blitz) pairs[key].blitz++;
     });
   });
+
   if (Object.keys(pairs).length) {
-    html += `<div class="card"><div class="card-title">Partnership records (all-time)</div>
-    <table class="games-table"><thead><tr><th>Partners</th><th>Games</th><th>W</th><th>L</th><th>Net $</th></tr></thead><tbody>`;
-    Object.entries(pairs).sort((a,b)=>b[1].net-a[1].net).forEach(([pair,st]) => {
+    html += `<div class="card"><div class="card-title">Partnership records · ${filterLabel}</div>
+    <div class="partner-scroll-wrap">
+    <table class="games-table partner-table">
+      <thead><tr>
+        <th>Partners</th><th>G</th><th>W%</th><th>W/L</th><th>Bid%</th><th>Sets</th><th>Bos</th><th>Cam</th><th>Blitz</th><th>Net $</th>
+      </tr></thead><tbody>`;
+    Object.entries(pairs).sort((a,b)=>b[1].wins/Math.max(1,b[1].games)-a[1].wins/Math.max(1,a[1].games)).forEach(([pair,st]) => {
+      const wr = st.games ? Math.round(st.wins/st.games*100)+'%' : '—';
+      const bp = st.bids ? Math.round(st.bidsMade/st.bids*100)+'%' : '—';
       const nc = st.net>=0?'color:var(--green-bright)':'color:var(--red-bright)';
-      html += `<tr><td class="em">${pair}</td><td>${st.games}</td>
-        <td style="color:var(--green-bright)">${st.wins}</td>
-        <td style="color:var(--red-bright)">${st.losses}</td>
-        <td style="${nc}">$${st.net.toFixed(2)}</td></tr>`;
+      html += `<tr>
+        <td class="em" style="min-width:110px">${pair}</td>
+        <td>${st.games}</td>
+        <td style="color:${st.wins/Math.max(1,st.games)>=0.5?'var(--green-bright)':'var(--red-bright)'}">${wr}</td>
+        <td><span style="color:var(--green-bright)">${st.wins}</span>/<span style="color:var(--red-bright)">${st.losses}</span></td>
+        <td>${bp}</td>
+        <td style="${st.sets>0?'color:var(--red-bright)':''}">${st.sets}</td>
+        <td style="${st.bostons>0?'color:var(--green-bright)':''}">${st.bostons}</td>
+        <td style="${st.cams>0?'color:var(--amber)':''}">${st.cams}</td>
+        <td style="${st.blitz>0?'color:var(--red-bright)':''}">${st.blitz}</td>
+        <td style="${nc}">$${st.net.toFixed(2)}</td>
+      </tr>`;
     });
-    html += '</tbody></table></div>';
+    html += '</tbody></table></div></div>';
   }
 
   document.getElementById('stats-content').innerHTML = html;
@@ -2117,7 +2271,7 @@ function startSession() {
   S.session = { games:[], rotationIdx:0, scoreA:0, scoreB:0, money:{}, pStats:{}, cfg, startedAt:Date.now() };
   S.players.forEach(p => { S.session.money[p]=0; S.session.pStats[p]={wins:0,losses:0,sets:0,bostons:0,cams:0,bids:0,bidsMade:0,kamA:0,kamM:0}; });
   resetForm();
-  document.getElementById('session-banner').classList.remove('show');
+  dismissWinPopup();
   save();
   nav('play');
 }
