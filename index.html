@@ -131,12 +131,12 @@ body {
 }
 
 /* ── Score Panel ── */
-.score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .score-panel {
   background: var(--felt-lighter);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 14px 16px;
+  padding: 10px 12px;
   position: relative;
   transition: border-color 0.2s, background 0.2s;
 }
@@ -171,20 +171,20 @@ body {
   letter-spacing: 0.1em;
   color: var(--gold-dim);
   font-family: 'DM Mono', monospace;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 .score-names {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--cream);
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .score-big {
   font-family: 'Playfair Display', serif;
-  font-size: 42px;
+  font-size: 32px;
   line-height: 1;
   color: var(--gold-pale);
 }
@@ -192,8 +192,8 @@ body {
 
 /* Progress bar under score */
 .score-bar-wrap {
-  margin-top: 8px;
-  height: 4px;
+  margin-top: 5px;
+  height: 3px;
   background: var(--cream-faint);
   border-radius: 2px;
   overflow: hidden;
@@ -208,17 +208,17 @@ body {
 .score-panel.blitz .score-bar-fill { background: var(--red-bright); }
 
 .score-target {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--cream-dim);
-  margin-top: 4px;
+  margin-top: 2px;
 }
 .score-pips {
   display: flex; gap: 3px; flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top: 5px;
 }
 .pip {
-  width: 13px; height: 13px;
-  border-radius: 3px;
+  width: 10px; height: 10px;
+  border-radius: 2px;
   background: var(--cream-faint);
   border: 1px solid var(--border);
   transition: all 0.2s;
@@ -1462,12 +1462,16 @@ function updatePreview() {
     }
   } else if (!fKam) {
     if (res.madeIt) {
-      let payout = cfg.win * blitzMult;
-      if (res.isBos) payout += cfg.boston * blitzMult;
-      if (res.isCam) payout += cfg.cam * blitzMult;
-      lines.push(`<span class="made">${bidTeamNames} made it — collect $${payout.toFixed(2)}${bidBlitz?' (blitz)':''}</span>`);
-      if (res.isBos) lines.push(`<span class="gold">Boston! +$${(cfg.boston*blitzMult).toFixed(2)} bonus</span>`);
-      if (res.isCam) lines.push(`<span class="gold">Cambridge! +$${(cfg.cam*blitzMult).toFixed(2)} bonus</span>`);
+      const bosPay = res.isBos ? (cfg.boston * blitzMult) : 0;
+      const camPay = res.isCam ? (cfg.cam * blitzMult) : 0;
+      const bonus = bosPay + camPay;
+      if (bonus > 0) {
+        lines.push(`<span class="made">${bidTeamNames} made it${bidBlitz?' (blitz)':''} — +$${bonus.toFixed(2)} bonus</span>`);
+        if (res.isBos) lines.push(`<span class="gold">Boston! +$${bosPay.toFixed(2)}</span>`);
+        if (res.isCam) lines.push(`<span class="gold">Cambridge! +$${camPay.toFixed(2)}</span>`);
+      } else {
+        lines.push(`<span class="made">${bidTeamNames} made it${bidBlitz?' (blitz)':''} — no money this hand</span>`);
+      }
     } else {
       const pen = (cfg.set * blitzMult).toFixed(2);
       lines.push(`<span class="set">${bidTeamNames} set — pay $${pen}${bidBlitz?' (blitz)':''}</span>`);
@@ -1519,11 +1523,14 @@ function logGame() {
     }
   } else {
     if (res.madeIt) {
-      let pay = cfg.win * blitzMult;
-      if (res.isBos) pay += cfg.boston * blitzMult;
-      if (res.isCam) pay += cfg.cam * blitzMult;
-      bidTeam.forEach(p => delta[p] += pay);
-      otherTeam.forEach(p => delta[p] -= pay);
+      // Win bonus ($5) only paid at session end (9 pts) — not per hand
+      let bonus = 0;
+      if (res.isBos) bonus += cfg.boston * blitzMult;
+      if (res.isCam) bonus += cfg.cam * blitzMult;
+      if (bonus > 0) {
+        bidTeam.forEach(p => delta[p] += bonus);
+        otherTeam.forEach(p => delta[p] -= bonus);
+      }
     } else {
       const pen = cfg.set * blitzMult;
       bidTeam.forEach(p => delta[p] -= pen);
