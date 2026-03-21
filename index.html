@@ -851,8 +851,35 @@ body {
   transition: all 0.15s;
 }
 .btn-rm:hover { border-color: var(--red-bright); color: var(--red-bright); }
-.add-player-row { display: flex; gap: 8px; margin-top: 10px; }
-.add-player-row input { flex: 1; }
+.add-player-row { display: flex; gap: 8px; margin-top: 10px; align-items: stretch; }
+.player-name-input {
+  flex: 1; min-width: 0;
+  background: var(--felt-lighter); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--cream);
+  padding: 10px 12px; font-size: 14px; font-family: 'DM Sans', sans-serif;
+  outline: none; transition: border-color 0.15s;
+}
+.player-name-input:focus { border-color: var(--gold); }
+/* Drag handle */
+.drag-handle {
+  cursor: grab; padding: 4px 10px 4px 0; color: var(--cream-dim);
+  font-size: 16px; touch-action: none; flex-shrink: 0; user-select: none;
+  line-height: 1;
+}
+.drag-handle:active { cursor: grabbing; }
+.player-list-item.dragging { opacity: 0.4; }
+.player-list-item.drag-over { box-shadow: 0 -2px 0 var(--gold); }
+/* Bench players */
+.bench-section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.bench-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--cream-dim); font-family: 'DM Mono', monospace; margin-bottom: 8px; }
+.bench-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.bench-chip {
+  background: var(--felt-lighter); border: 1px solid var(--border);
+  color: var(--cream-dim); font-size: 12px; padding: 5px 12px;
+  border-radius: 20px; cursor: pointer; font-family: 'DM Sans', sans-serif;
+  -webkit-tap-highlight-color: transparent; transition: all 0.15s;
+}
+.bench-chip:active { border-color: var(--gold); color: var(--gold); }
 .btn-add {
   background: var(--felt-lighter);
   border: 1px solid var(--border-strong);
@@ -1242,8 +1269,11 @@ body { -webkit-text-size-adjust: 100%; }
 .insights-tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
 /* ── Trend tab ── */
 .trend-metric-picker {
-  display: flex; gap: 6px; flex-wrap: wrap; padding: 14px 16px 4px;
+  display: flex; gap: 6px; flex-wrap: nowrap; padding: 14px 16px 4px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.trend-metric-picker::-webkit-scrollbar { display: none; }
 .trend-metric-btn {
   background: var(--felt-lighter); border: 1px solid var(--border);
   color: var(--cream-dim); font-size: 11px; font-family: 'DM Sans', sans-serif;
@@ -1307,6 +1337,10 @@ body { -webkit-text-size-adjust: 100%; }
 .insights-row:last-child { border-bottom: none; }
 .insights-key { font-size: 12px; color: var(--cream-dim); flex: 1; padding-right: 8px; }
 .insights-val { font-size: 12px; font-weight: 500; font-family: 'DM Mono', monospace; text-align: right; }
+/* Stacked row: label on top, value below */
+.insights-row.stacked { flex-direction: column; align-items: flex-start; gap: 3px; }
+.insights-row.stacked .insights-key { padding-right: 0; }
+.insights-row.stacked .insights-val { text-align: left; font-size: 11px; color: var(--cream-dim); font-weight: 400; word-break: break-all; }
 .insights-val.pos { color: var(--green-bright); }
 .insights-val.neg { color: var(--red-bright); }
 .insights-val.gold { color: var(--gold); }
@@ -1709,10 +1743,10 @@ body { -webkit-text-size-adjust: 100%; }
   <div class="view" id="view-setup">
     <div class="card">
       <div class="card-title">Players &amp; Teams</div>
-      <div style="font-size:11px;color:var(--cream-dim);margin-bottom:10px">Positions 1–2 = <span style="color:var(--gold-dim)">Team A</span> · Positions 3–4 = <span style="color:var(--teal-dim)">Team B</span>. Use ↑↓ to reorder.</div>
+      <div style="font-size:11px;color:var(--cream-dim);margin-bottom:10px">Positions 1–2 = <span style="color:var(--gold-dim)">Team A</span> · Positions 3–4 = <span style="color:var(--teal-dim)">Team B</span>. Drag ≡ to reorder.</div>
       <div id="player-list-setup"></div>
       <div class="add-player-row">
-        <input class="field input" type="text" id="inp-new-player" placeholder="Player name" onkeydown="if(event.key==='Enter')addPlayer()">
+        <input class="player-name-input" type="text" id="inp-new-player" placeholder="Player name" onkeydown="if(event.key==='Enter')addPlayer()">
         <button class="btn-add" onclick="addPlayer()">Add</button>
       </div>
     </div>
@@ -2752,23 +2786,130 @@ function renderStats() {
 }
 
 // ── Render Setup ───────────────────────────────────
+function getBenchPlayers() {
+  const known = new Set();
+  Object.keys(S.allTimeStats || {}).forEach(p => known.add(p));
+  Object.keys(S.allTimeMoney || {}).forEach(p => known.add(p));
+  allGamesDeduped().forEach(g => {
+    (g.teamA||[]).forEach(p => known.add(p));
+    (g.teamB||[]).forEach(p => known.add(p));
+  });
+  return [...known].filter(p => !S.players.includes(p)).sort();
+}
+
 function renderSetup() {
   const list = document.getElementById('player-list-setup');
   const teamLabels = ['Team A','Team A','Team B','Team B'];
   const teamColors = ['var(--gold-dim)','var(--gold-dim)','var(--teal-dim)','var(--teal-dim)'];
-  list.innerHTML = S.players.map((p,i) => {
-    const label = i < 4 ? `<span style="font-size:9px;font-family:'DM Mono',monospace;letter-spacing:0.08em;color:${teamColors[i]};text-transform:uppercase;margin-right:8px">${teamLabels[i]}</span>` : '';
-    return `<div class="player-list-item">
-      <div style="display:flex;align-items:center;flex:1;min-width:0">
+  list.innerHTML = S.players.map((p, i) => {
+    const label = i < 4
+      ? `<span style="font-size:9px;font-family:'DM Mono',monospace;letter-spacing:0.08em;color:${teamColors[i]};text-transform:uppercase;min-width:44px">${teamLabels[i]}</span>`
+      : `<span style="font-size:9px;font-family:'DM Mono',monospace;color:var(--cream-dim);min-width:44px">Sub</span>`;
+    return `<div class="player-list-item" data-pidx="${i}">
+      <span class="drag-handle">≡</span>
+      <div style="display:flex;align-items:center;flex:1;min-width:0;gap:6px">
         ${label}<span class="player-list-name">${p}</span>
       </div>
-      <div style="display:flex;gap:4px;align-items:center">
-        <button class="btn-rm" onclick="movePlayer(${i},-1)" ${i===0?'disabled':''} style="padding:3px 8px">↑</button>
-        <button class="btn-rm" onclick="movePlayer(${i},1)" ${i===S.players.length-1?'disabled':''} style="padding:3px 8px">↓</button>
-        <button class="btn-rm" onclick="removePlayer(${i})">Remove</button>
-      </div>
+      <button class="btn-rm" onclick="removePlayer(${i})">Remove</button>
     </div>`;
   }).join('');
+
+  // Bench section
+  const bench = getBenchPlayers();
+  if (bench.length) {
+    list.innerHTML += `<div class="bench-section">
+      <div class="bench-label">Bench — tap to add to roster</div>
+      <div class="bench-chips">${bench.map(p =>
+        `<div class="bench-chip" onclick="addFromBench('${p.replace(/'/g,"\\'")}')">+ ${p}</div>`
+      ).join('')}</div>
+    </div>`;
+  }
+
+  initPlayerDrag();
+}
+
+let _pdFrom = null;
+
+function initPlayerDrag() {
+  const items = document.querySelectorAll('.player-list-item[data-pidx]');
+  items.forEach(el => {
+    // Desktop HTML5 drag
+    el.setAttribute('draggable', 'true');
+    el.addEventListener('dragstart', e => {
+      _pdFrom = parseInt(el.dataset.pidx);
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => el.classList.add('dragging'), 0);
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('dragging');
+      items.forEach(i => i.classList.remove('drag-over'));
+    });
+    el.addEventListener('dragover', e => {
+      e.preventDefault();
+      items.forEach(i => i.classList.remove('drag-over'));
+      el.classList.add('drag-over');
+    });
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      const to = parseInt(el.dataset.pidx);
+      if (_pdFrom !== null && _pdFrom !== to) movePlayerTo(_pdFrom, to);
+      _pdFrom = null;
+      items.forEach(i => i.classList.remove('drag-over'));
+    });
+
+    // Mobile touch drag on handle
+    const handle = el.querySelector('.drag-handle');
+    if (!handle) return;
+    let touchStartY = 0;
+
+    handle.addEventListener('touchstart', e => {
+      _pdFrom = parseInt(el.dataset.pidx);
+      touchStartY = e.touches[0].clientY;
+      el.classList.add('dragging');
+    }, { passive: true });
+
+    handle.addEventListener('touchmove', e => {
+      if (_pdFrom === null) return;
+      e.preventDefault();
+      const dy = e.touches[0].clientY - touchStartY;
+      el.style.transform = `translateY(${dy}px)`;
+      el.style.zIndex = '50';
+      el.style.position = 'relative';
+      // Find item under finger
+      el.style.pointerEvents = 'none';
+      const under = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+      el.style.pointerEvents = '';
+      const target = under?.closest('.player-list-item[data-pidx]');
+      items.forEach(i => i.classList.remove('drag-over'));
+      if (target && target !== el) target.classList.add('drag-over');
+    }, { passive: false });
+
+    handle.addEventListener('touchend', e => {
+      if (_pdFrom === null) return;
+      el.style.transform = '';
+      el.style.zIndex = '';
+      el.style.position = '';
+      el.classList.remove('dragging');
+      items.forEach(i => i.classList.remove('drag-over'));
+      const touch = e.changedTouches[0];
+      el.style.pointerEvents = 'none';
+      const under = document.elementFromPoint(touch.clientX, touch.clientY);
+      el.style.pointerEvents = '';
+      const target = under?.closest('.player-list-item[data-pidx]');
+      const from = _pdFrom;
+      _pdFrom = null;
+      if (target) {
+        const to = parseInt(target.dataset.pidx);
+        if (from !== to) movePlayerTo(from, to);
+      }
+    });
+  });
+}
+
+function movePlayerTo(from, to) {
+  const p = S.players.splice(from, 1)[0];
+  S.players.splice(to, 0, p);
+  save(); renderSetup();
 }
 
 function movePlayer(i, dir) {
@@ -2787,9 +2928,15 @@ function addPlayer() {
   save(); renderSetup();
 }
 
+function addFromBench(name) {
+  if (S.players.includes(name)) return;
+  S.players.push(name);
+  save(); renderSetup();
+}
+
 function removePlayer(i) {
   if (S.players.length <= 4) return alert('Need at least 4 players.');
-  S.players.splice(i,1);
+  S.players.splice(i, 1);
   save(); renderSetup();
 }
 
@@ -2947,6 +3094,13 @@ function closeInsights() {
   document.getElementById('insights-overlay').classList.remove('open');
   document.body.style.overflow = '';
   _insightsPlayer = null;
+}
+
+function insRowStacked(key, val, defKey) {
+  if (defKey) {
+    return `<div class="insights-row stacked tappable" onclick="showMetricDef('${defKey}')"><span class="insights-key">${key} <span class="ins-info">ⓘ</span></span><span class="insights-val">${val}</span></div>`;
+  }
+  return `<div class="insights-row stacked"><span class="insights-key">${key}</span><span class="insights-val">${val}</span></div>`;
 }
 
 function insRow(key, val, cls, defKey) {
@@ -3954,8 +4108,8 @@ function renderInsights() {
     return `${b}: ${wr}%`;
   }).join(' · ');
 
-  if (winByBidStr) html += insRow('Win Rate by Bid Level', winByBidStr, '', 'win-by-bid');
-  if (setByBidStr) html += insRow('Set Rate by Bid Level', setByBidStr, '', 'set-by-bid');
+  if (winByBidStr) html += insRowStacked('Win Rate by Bid Level', winByBidStr, 'win-by-bid');
+  if (setByBidStr) html += insRowStacked('Set Rate by Bid Level', setByBidStr, 'set-by-bid');
   html += insRow('Clutch Score (bids in blitz)', clutchScore !== null ? `${clutchScore}%` : blitzBidGames.length < 3 ? 'Too few blitz bids' : '—', clutchScore !== null ? (clutchScore >= 55 ? 'pos' : clutchScore < 40 ? 'neg' : '') : '', 'clutch');
   html += insRow('Kamikaze', kamGames.length ? `${kamSucc} · avg $${kamROI >= 0 ? '+' : ''}${kamROI.toFixed(2)}` : '0', '', 'kamikaze');
   html += insRow('Hot Hand (max win streak)', `${maxStreak}`, maxStreak >= 5 ? 'gold' : '', 'hot-hand');
