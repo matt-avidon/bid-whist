@@ -407,7 +407,24 @@ body {
 .team-btn-names { font-size: 13px; font-weight: 500; }
 
 /* Player selector */
-.player-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+.player-grid { display: flex; gap: 0; align-items: flex-start; }
+.bidder-team-group { flex: 1; min-width: 0; }
+.bidder-team-label {
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.bidder-team-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.bidder-team-divider {
+  width: 1px;
+  background: var(--border);
+  align-self: stretch;
+  margin: 0 10px;
+  flex-shrink: 0;
+}
 .player-empty-hint {
   font-size: 13px;
   color: var(--cream-dim);
@@ -1025,36 +1042,26 @@ body { -webkit-text-size-adjust: 100%; }
       <div class="card">
         <div class="card-title">Log a game</div>
 
-        <!-- Step 1: Bid team -->
+        <!-- Step 1: Bidder (team inferred) -->
         <div class="log-step">
           <div class="log-label" id="lbl-step1">
-            <span class="step-done">✓</span>1 — Who won the bid?
+            <span class="step-done">✓</span>1 — Who bid?
           </div>
-          <div class="team-toggle" id="team-toggle"></div>
+          <div class="player-grid" id="player-grid"></div>
         </div>
 
-        <!-- Step 2: Bidder -->
+        <!-- Step 2: Bid amount -->
         <div class="log-step">
           <div class="log-label" id="lbl-step2">
-            <span class="step-done">✓</span>2 — Which player bid?
-          </div>
-          <div class="player-grid" id="player-grid">
-            <span class="player-empty-hint">Select a team above first</span>
-          </div>
-        </div>
-
-        <!-- Step 3: Bid amount -->
-        <div class="log-step">
-          <div class="log-label" id="lbl-step3">
-            <span class="step-done">✓</span>3 — Bid amount
+            <span class="step-done">✓</span>2 — Bid amount
           </div>
           <div class="bid-grid" id="bid-grid"></div>
         </div>
 
-        <!-- Step 4: Hands -->
+        <!-- Step 3: Hands -->
         <div class="log-step">
-          <div class="log-label" id="lbl-step4">
-            <span class="step-done">✓</span>4 — Hands won by bidding team
+          <div class="log-label" id="lbl-step3">
+            <span class="step-done">✓</span>3 — Hands won by bidding team
           </div>
           <div class="hands-zones" id="hands-zones">
             <div class="hands-zone set-zone">
@@ -1284,12 +1291,14 @@ function setBidTeam(t) {
 }
 
 function setBidder(p) {
+  const rot = curRot();
+  fBidTeam = [rot[0], rot[1]].includes(p) ? 'A' : 'B';
   fBidder = p;
   document.querySelectorAll('.player-btn').forEach(b => {
     b.classList.remove('sel-a','sel-b');
     if (b.dataset.player === p) b.classList.add(teamSelClass(fBidTeam));
   });
-  markStep('lbl-step2', true);
+  markStep('lbl-step1', true);
   updatePreview();
 }
 
@@ -1299,7 +1308,7 @@ function setBid(b) {
     el.classList.remove('sel-a','sel-b');
     if (parseInt(el.dataset.bid) === b) el.classList.add(teamSelClass(fBidTeam || 'A'));
   });
-  markStep('lbl-step3', true);
+  markStep('lbl-step2', true);
   renderHandsGrid();
   updatePreview();
 }
@@ -1307,7 +1316,7 @@ function setBid(b) {
 function setHands(h) {
   fHands = h;
   renderHandsGrid();
-  markStep('lbl-step4', true);
+  markStep('lbl-step3', true);
   updatePreview();
 }
 
@@ -1392,17 +1401,22 @@ function setKamOutcome(o) {
 }
 
 function rebuildBidderGrid() {
-  const grid = document.getElementById('player-grid');
-  if (!fBidTeam) {
-    grid.innerHTML = '<span class="player-empty-hint">Select a team above first</span>';
-    return;
-  }
   const rot = curRot();
-  const players = fBidTeam === 'A' ? [rot[0],rot[1]] : [rot[2],rot[3]];
-  const selClass = teamSelClass(fBidTeam);
-  grid.innerHTML = players.map(p =>
-    `<button class="player-btn${fBidder===p?' '+selClass:''}" data-player="${p}" onclick="setBidder('${p}')">${p}</button>`
-  ).join('');
+  const grid = document.getElementById('player-grid');
+  function btn(p, team) {
+    const sel = fBidder === p ? ' ' + teamSelClass(team) : '';
+    return `<button class="player-btn${sel}" data-player="${p}" onclick="setBidder('${p}')">${p}</button>`;
+  }
+  grid.innerHTML = `
+    <div class="bidder-team-group">
+      <div class="bidder-team-label team-a-label">Team A</div>
+      <div class="bidder-team-btns">${btn(rot[0],'A')}${btn(rot[1],'A')}</div>
+    </div>
+    <div class="bidder-team-divider"></div>
+    <div class="bidder-team-group">
+      <div class="bidder-team-label team-b-label">Team B</div>
+      <div class="bidder-team-btns">${btn(rot[2],'B')}${btn(rot[3],'B')}</div>
+    </div>`;
 }
 
 // ── Scoring logic ──────────────────────────────────
@@ -1619,7 +1633,7 @@ function logGame() {
 function resetForm() {
   fBidTeam=null; fBidder=null; fBid=null; fKam=false; fKamOutcome=null;
   fHands=7;
-  ['lbl-step1','lbl-step2','lbl-step3','lbl-step4'].forEach(id => markStep(id, false));
+  ['lbl-step1','lbl-step2','lbl-step3'].forEach(id => markStep(id, false));
   document.getElementById('kam-toggle-label').classList.remove('on');
   document.getElementById('kam-opts').classList.remove('show');
   updateStickyBtn(false);
@@ -1747,17 +1761,6 @@ function renderPlay() {
         ${teamBPlayers.map(moneyPlayerHTML).join('')}
       </div>
     </div>`;
-
-  // Team toggle
-  document.getElementById('team-toggle').innerHTML = `
-    <button class="team-btn ${fBidTeam==='A'?'sel-a':''}" data-team="A" onclick="setBidTeam('A')">
-      <div class="team-btn-label">Team A</div>
-      <div class="team-btn-names">${rot[0]} & ${rot[1]}</div>
-    </button>
-    <button class="team-btn ${fBidTeam==='B'?'sel-b':''}" data-team="B" onclick="setBidTeam('B')">
-      <div class="team-btn-label b">Team B</div>
-      <div class="team-btn-names">${rot[2]} & ${rot[3]}</div>
-    </button>`;
 
   // Bid grid
   document.getElementById('bid-grid').innerHTML = [1,2,3,4,5,6,7].map(b => {
