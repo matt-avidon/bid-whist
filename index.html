@@ -1916,25 +1916,34 @@ load();
 renderSetup();
 if (S.session) { nav('play'); } else { nav('setup'); }
 
-// Firebase real-time listener — syncs changes from all users
-db.ref('whist').on('value', snapshot => {
-  const data = snapshot.val();
-  // Mark as live as soon as Firebase responds (even if empty)
-  const el = document.getElementById('conn-indicator');
-  if (el) { el.textContent = '⬤ live'; el.style.color = 'var(--teal)'; }
+function applyRemoteData(data) {
   if (!data) return;
   S = data;
   localStorage.setItem('whist4', JSON.stringify(S));
-  // Re-render whichever view is currently active
   const active = document.querySelector('.view.active');
   if (!active) return;
   if (active.id === 'view-play') renderPlay();
   else if (active.id === 'view-history') renderHistory();
   else if (active.id === 'view-stats') renderStats();
-  // Don't re-render setup to avoid interrupting text input
+}
+
+function setLive() {
+  const el = document.getElementById('conn-indicator');
+  if (el) { el.textContent = '⬤ live'; el.style.color = 'var(--teal)'; }
+}
+
+// Initial load — fast one-time read to populate data and show live immediately
+db.ref('whist').once('value')
+  .then(snap => { setLive(); applyRemoteData(snap.val()); })
+  .catch(() => {});
+
+// Real-time listener — keeps all users in sync after initial load
+db.ref('whist').on('value', snapshot => {
+  setLive();
+  applyRemoteData(snapshot.val());
 });
 
-// Connection status dot — fallback to offline if disconnected
+// Mark offline if WebSocket drops
 db.ref('.info/connected').on('value', snap => {
   if (snap.val() === false) {
     const el = document.getElementById('conn-indicator');
