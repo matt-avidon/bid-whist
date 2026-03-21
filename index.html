@@ -920,6 +920,7 @@ body {
 /* ── History ── */
 .history-session { margin-bottom: 20px; }
 .history-session-hdr {
+  display: flex; align-items: center; gap: 6px;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -928,7 +929,18 @@ body {
   margin-bottom: 8px;
   padding-bottom: 6px;
   border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
+.history-session-hdr:active { opacity: 0.7; }
+.hist-chevron { transition: transform 0.2s; flex-shrink: 0; }
+.hist-chevron.collapsed { transform: rotate(-90deg); }
+.hist-body { overflow: hidden; }
+.hist-body.collapsed { display: none; }
+.hist-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.games-table td, .games-table th { white-space: nowrap; }
+.games-table { font-size: 11px; }
 
 /* ── Empty ── */
 .empty {
@@ -1439,6 +1451,9 @@ body { -webkit-text-size-adjust: 100%; }
 /* Tappable insights row */
 .insights-row.tappable { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .insights-row.tappable:active { background: rgba(201,168,76,0.06); border-radius: 4px; margin: 0 -4px; padding: 6px 4px; }
+/* Any element with data-def is tappable for definition */
+[data-def] { cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity 0.1s; }
+[data-def]:active { opacity: 0.7; }
 .ins-info {
   font-size: 11px; color: var(--gold); margin-left: 5px;
   font-family: 'DM Mono', monospace; opacity: 0.85; vertical-align: middle;
@@ -2396,24 +2411,44 @@ function renderHistory() {
     document.getElementById('history-content').innerHTML = '<div class="empty"><div class="empty-icon">♦</div><div class="empty-title">No history yet</div></div>';
     return;
   }
+  // Default: collapse all past sessions on first render (current session stays open)
+  sessions.forEach((sess, si) => {
+    if (!sess.isCurrent) {
+      const key = sess.endedAt || ('past-'+si);
+      if (!_collapsedSessions.has('__initialized_'+key)) {
+        _collapsedSessions.add(key);
+        _collapsedSessions.add('__initialized_'+key);
+      }
+    }
+  });
+  const thStyle = 'color:var(--cream-dim);font-size:9px;font-weight:500';
   let html = '';
   sessions.slice().reverse().forEach((sess, si) => {
     const label = sess.isCurrent ? 'Current session' : `Session ${all.length - si}`;
     const games = sess.games || [];
     const sessionDate = games.length && games[0].ts ? new Date(games[0].ts).toLocaleDateString() : '';
-    html += `<div class="history-session"><div class="history-session-hdr">${label} · ${games.length} games${sessionDate ? ' · ' + sessionDate : ''}</div>
-    <div class="card" style="padding:0;overflow:hidden">
-    <table class="games-table">
-      <thead><tr>
-        <th style="color:var(--cream-dim);font-size:10px;font-weight:500">#</th>
-        <th style="color:var(--cream-dim);font-size:10px;font-weight:500">Time</th>
-        <th style="color:var(--cream-dim);font-size:10px;font-weight:500">Bidder</th>
-        <th style="color:var(--cream-dim);font-size:10px;font-weight:500">Bid</th>
-        <th class="col-hands" style="color:var(--cream-dim);font-size:10px;font-weight:500">Hands</th>
-        <th style="color:var(--cream-dim);font-size:10px;font-weight:500">Result</th>
-        <th style="color:var(--cream-dim);font-size:10px;font-weight:500">Flags</th>
-        <th style="color:var(--cream-dim);font-size:10px;font-weight:500">Score</th>
-      </tr></thead><tbody>`;
+    const key = sess.isCurrent ? 'current' : (sess.endedAt || ('past-'+si));
+    const collapsed = _collapsedSessions.has(key);
+    const chevron = collapsed ? '▶' : '▼';
+    html += `<div class="history-session">
+      <div class="history-session-hdr" onclick="toggleHistorySession('${key}')">
+        <span class="hist-chevron${collapsed?' collapsed':''}">${chevron}</span>
+        <span>${label} · ${games.length} games${sessionDate ? ' · ' + sessionDate : ''}</span>
+      </div>
+      <div class="hist-body${collapsed?' collapsed':''}">
+        <div class="card" style="padding:0;overflow:hidden">
+        <div class="hist-table-wrap">
+        <table class="games-table">
+          <thead><tr>
+            <th style="${thStyle}">#</th>
+            <th style="${thStyle}">Time</th>
+            <th style="${thStyle}">Bidder</th>
+            <th style="${thStyle}">Bid</th>
+            <th style="${thStyle}">Hands</th>
+            <th style="${thStyle}">Result</th>
+            <th style="${thStyle}">Flags</th>
+            <th style="${thStyle}">Score</th>
+          </tr></thead><tbody>`;
     games.slice().reverse().forEach(g => {
       const flags = [
         g.boston?'<span class="badge bos">Bos</span>':'',
@@ -2428,16 +2463,16 @@ function renderHistory() {
       const timeStr = g.ts ? new Date(g.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '—';
       html += `<tr>
         <td style="color:var(--gold-dim);font-family:'DM Mono',monospace">${g.n}</td>
-        <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--cream-dim)">${timeStr}</td>
+        <td style="font-family:'DM Mono',monospace;color:var(--cream-dim)">${timeStr}</td>
         <td class="em">${g.bidder}</td>
         <td style="font-family:'DM Mono',monospace">${g.bid}</td>
-        <td class="col-hands" style="font-family:'DM Mono',monospace">${g.bidHands}–${g.otherHands}</td>
+        <td style="font-family:'DM Mono',monospace">${g.bidHands}–${g.otherHands}</td>
         <td>${res}</td>
         <td>${flags||'–'}</td>
-        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--cream-dim)">${g.scoreA}–${g.scoreB}</td>
+        <td style="font-family:'DM Mono',monospace;color:var(--cream-dim)">${g.scoreA}–${g.scoreB}</td>
       </tr>`;
     });
-    html += `</tbody></table></div></div>`;
+    html += `</tbody></table></div></div></div></div>`;
   });
   document.getElementById('history-content').innerHTML = html;
 }
@@ -2740,6 +2775,18 @@ function resetAll() {
   save(); nav('setup');
 }
 
+// ── History collapsible sessions ───────────────────
+const _collapsedSessions = new Set();
+
+function toggleHistorySession(key) {
+  if (_collapsedSessions.has(key)) {
+    _collapsedSessions.delete(key);
+  } else {
+    _collapsedSessions.add(key);
+  }
+  renderHistory();
+}
+
 // ── Individual Insights ────────────────────────────
 let _insightsPlayer = null;
 let _insightsTab = 'overview';
@@ -2808,7 +2855,21 @@ const METRIC_DEFS = {
   'arch-gambler': { title:'Archetype: Gambler 🎲', formula:'Gambler Score ≥ 1.2 AND Set Rate > 35%', desc:'Gamblers bid high and aren\'t afraid to get set. They go for big hands and live with the consequences. High risk, high reward — great when the cards cooperate, costly when they don\'t.' },
   'arch-robinhood': { title:'Archetype: Robinhood 🏹', formula:'Blitz bid win% ≥ 55% with ≥3 qualifying bids', desc:'Robinhoods play their best when they\'re behind. When their team is in blitz (negative points), they step up and make bids at a higher-than-average rate. The clutch player.' },
   'arch-anchor': { title:'Archetype: Anchor ⚓', formula:'Defending win% ≥ 60% with ≥5 defending games', desc:'Anchors dominate when they\'re not the ones bidding. Their team wins the majority of hands as the defending side, holding opponents in check and earning points without ever needing to bid.' },
-  'arch-balanced': { title:'Archetype: Balanced ⚖️', formula:'No archetype threshold met yet', desc:'Balanced players haven\'t crossed the threshold for any single archetype—or are effective across all three dimensions. Either needs more data or is genuinely well-rounded at every aspect of the game.' }
+  'arch-balanced': { title:'Archetype: Balanced ⚖️', formula:'No archetype threshold met yet', desc:'Balanced players haven\'t crossed the threshold for any single archetype—or are effective across all three dimensions. Either needs more data or is genuinely well-rounded at every aspect of the game.' },
+
+  // ── Advanced (Nerd) metric definitions ──
+  'pba': { title:'Pure Bid Average (PBA)', formula:'Bids Made ÷ Total Bids (non-Kamikaze)', desc:'The cleanest raw skill metric. What fraction of your bids do you actually make? .712 means you make 71.2% of your bids. Elite is above .650; below .500 means you\'re getting set more than half the time.' },
+  'wbv': { title:'Weighted Bid Value (WBV)', formula:'Sum(bidHands − 6 on made bids) ÷ Total Bids', desc:'Points generated per bid attempt. Uses only made bids in the numerator but ALL bids (made + set) in the denominator — so sets drag the score down. High WBV means you win big when you bid and don\'t waste attempts on sets.' },
+  'br-bri': { title:'Bid Rate & Bid Rate Index (BRI)', formula:'BR = Bids ÷ Games · BRI = BR ÷ 0.25', desc:'BR is how often you hold the bid. League average is 0.25 (one of four players bids per game). BRI normalizes it: 1.0 = exactly your share, >1.0 = bids more than average, <1.0 = lets others bid. High BRI with good PBA = a strong bidder.' },
+  'asab': { title:'Avg Score Above Bid (ASAB)', formula:'avg(bidHandsWon − 6 − bid) on made bids', desc:'When you make your bid, how many extra points did you score above the bid minimum? Positive ASAB means you often overbid your hand or just win more than needed — could signal underbidding. Negative ASAB means you barely squeak through — tight but accurate.' },
+  'bps': { title:'Bid Performance Score (BPS)', formula:'BFS × (AB × PBA) ÷ League Avg(AB × PBA)', desc:'Composite offensive metric. BFS = your Bid Rate relative to league average. The second factor is your bid power (Avg Bid × PBA) vs the league. Multiply them together. 1.0 = exactly average, >1.5 = elite. Penalizes players who bid rarely OR have weak bid power — you need both.' },
+  'bid-ceiling': { title:'Bid Ceiling', formula:'First bid level where Set Rate exceeds 33%', desc:'The bid value at which you start losing more than 1-in-3 attempts. Your "safe zone" is everything below this number. If your ceiling is Bid 5, you should think twice before going to 6 or 7. If your ceiling is Bid 3, you\'re getting overextended at medium bids.' },
+  'book-eff-ratio': { title:'Book Efficiency (BE)', formula:'Sum(max(0, bidHands − 6)) ÷ Sum(bid)', desc:'The ratio of points actually delivered versus points promised across all bids. 1.0 = perfectly calibrated. Below 1.0 = losing books to sets more than you\'re winning above bid. A ratio of 0.84 means for every book you promised, you delivered 0.84. Low ratio = sets are killing your output.' },
+  'kroi': { title:'Kamikaze ROI (KROI)', formula:'Sum of your money delta across all Kamikaze games', desc:'Total net dollars won or lost across all Kamikaze attempts. Kamikaze carries a 2× win/loss multiplier, so a single bad call can offset multiple wins. Positive = you\'re making money on the gamble; negative = the risk isn\'t paying off.' },
+  'kwr': { title:'Kamikaze Win Rate (KWR)', formula:'Kamikaze Made ÷ Total Kamikaze Attempts', desc:'The % of your Kamikaze bids that you actually made. Kamikaze is high-stakes, so you want this above 50%. Combined with KROI, it tells you whether the risk is worth taking.' },
+  'pwr-m9': { title:'Partnership Win Rate (M9)', formula:'Wins with partner ÷ Games with partner', desc:'Your W/L record specifically when paired with this person. A strong pair will be above 55% together. Note this can be influenced by who your opponents were — use the full Chemistry Matrix for context.' },
+  'pnm-m10': { title:'Partnership Net Money (M10)', formula:'Sum(your money delta) for all games with this partner', desc:'Total dollars you\'ve won or lost specifically when playing with this partner. Because partners always win/lose the same amount, this also equals your partner\'s money from your games together. Positive = profitable pairing; negative = this combo is costly.' },
+  'confidence': { title:'Confidence', formula:'min(Games Played ÷ 50, 100%)', desc:'How statistically reliable the metrics are. At 50+ games, every metric has enough data to be meaningful. Below 50%, treat metrics as directional hints, not hard facts. The Phase 1 metrics become unlocked at 20 games; full confidence is reached at 50.' }
 };
 
 function showMetricDef(key) {
@@ -3050,7 +3111,7 @@ function renderInsightsAdvanced(player, games, allGames) {
 
   // Confidence block
   const confPct = Math.round(m.confidence * 100);
-  html += `<div class="ins-confidence-wrap">
+  html += `<div class="ins-confidence-wrap" data-def="confidence">
     <div class="ins-confidence-label">
       <span>Confidence</span><span>${confPct}%</span>
     </div>
@@ -3074,35 +3135,30 @@ function renderInsightsAdvanced(player, games, allGames) {
   // M1 — PBA
   const pbaDisp = m.pba !== null ? m.pba.toFixed(3) : '—';
   const pbaCls = m.pba !== null ? (m.pba >= 0.65 ? 'pos' : m.pba < 0.5 ? 'neg' : '') : 'dim';
-  html += `<div class="ins-metric-cell"><div class="ins-mc-label">M1 · PBA</div><div class="ins-mc-val ${pbaCls}">${pbaDisp}</div><div class="ins-mc-sub">Pure Bid Avg${m.bidGames.length < 10 ? ` (${m.bidGames.length}/10 bids)` : ''}</div></div>`;
+  html += `<div class="ins-metric-cell" data-def="pba"><div class="ins-mc-label">Pure Bid Avg</div><div class="ins-mc-val ${pbaCls}">${pbaDisp}</div><div class="ins-mc-sub">${m.bidGames.length < 10 ? `${m.bidGames.length}/10 bids` : m.bidGames.length+' bids'}</div></div>`;
 
-  // M4 — AB
   const abLabel = m.ab === null ? '—' : m.ab < 2 ? 'Conservative' : m.ab < 3 ? 'Moderate' : m.ab < 4.5 ? 'Aggressive' : 'Very Aggressive';
   const abDisp  = m.ab !== null ? m.ab.toFixed(1) : '—';
-  html += `<div class="ins-metric-cell"><div class="ins-mc-label">M4 · Avg Bid</div><div class="ins-mc-val">${abDisp}</div><div class="ins-mc-sub">${abLabel}</div></div>`;
+  html += `<div class="ins-metric-cell" data-def="avg-bid"><div class="ins-mc-label">Avg Bid</div><div class="ins-mc-val">${abDisp}</div><div class="ins-mc-sub">${abLabel}</div></div>`;
 
-  // M3 — BR + BRI
   const brDisp  = m.br !== null ? Math.round(m.br * 100) + '%' : '—';
   const briDisp = m.bri !== null ? m.bri.toFixed(1) + '×' : '';
   const briCls  = m.bri !== null ? (m.bri > 1.2 ? 'pos' : m.bri < 0.8 ? 'neg' : '') : 'dim';
-  html += `<div class="ins-metric-cell"><div class="ins-mc-label">M3 · Bid Rate</div><div class="ins-mc-val">${brDisp}</div><div class="ins-mc-sub">BRI <span class="${briCls}">${briDisp || '—'}</span> (1.0 = avg)</div></div>`;
+  html += `<div class="ins-metric-cell" data-def="br-bri"><div class="ins-mc-label">Bid Rate</div><div class="ins-mc-val">${brDisp}</div><div class="ins-mc-sub">BRI <span class="${briCls}">${briDisp || '—'}</span> (1.0 = avg)</div></div>`;
 
-  // M5 — ASAB
   const asabDisp = m.asab !== null ? (m.asab >= 0 ? '+' : '') + m.asab.toFixed(1) : '—';
   const asabCls  = m.asab !== null ? (m.asab > 0.5 ? 'neg' : m.asab < -0.5 ? 'pos' : '') : 'dim';
   const asabSub  = m.asab === null ? `Need ≥10 made` : m.asab > 0.5 ? 'Tends to underbid' : m.asab < -0.5 ? 'Accurate bidder' : 'Well calibrated';
-  html += `<div class="ins-metric-cell"><div class="ins-mc-label">M5 · ASAB</div><div class="ins-mc-val ${asabCls}">${asabDisp}</div><div class="ins-mc-sub">${asabSub}</div></div>`;
+  html += `<div class="ins-metric-cell" data-def="asab"><div class="ins-mc-label">Score Above Bid</div><div class="ins-mc-val ${asabCls}">${asabDisp}</div><div class="ins-mc-sub">${asabSub}</div></div>`;
 
-  // M2 — WBV
   const wbvDisp = m.wbv !== null ? m.wbv.toFixed(2) : '—';
   const wbvCls  = m.wbv !== null ? (m.wbv >= 2.5 ? 'pos' : m.wbv < 1.5 ? 'neg' : '') : 'dim';
-  html += `<div class="ins-metric-cell"><div class="ins-mc-label">M2 · WBV</div><div class="ins-mc-val ${wbvCls}">${wbvDisp}</div><div class="ins-mc-sub">Pts per bid attempt</div></div>`;
+  html += `<div class="ins-metric-cell" data-def="wbv"><div class="ins-mc-label">Weighted Bid Val</div><div class="ins-mc-val ${wbvCls}">${wbvDisp}</div><div class="ins-mc-sub">Pts per bid attempt</div></div>`;
 
-  // M11 — BE
   const beDisp = m.be !== null ? m.be.toFixed(2) : '—';
   const beCls  = m.be !== null ? (m.be >= 0.9 ? 'pos' : m.be < 0.7 ? 'neg' : '') : 'dim';
   const beSub  = m.be !== null ? (m.be >= 1.0 ? 'Perfect delivery' : m.be >= 0.9 ? 'Efficient' : m.be < 0.7 ? 'Sets dragging' : 'Solid') : 'Need ≥10 bids';
-  html += `<div class="ins-metric-cell"><div class="ins-mc-label">M11 · Book Eff</div><div class="ins-mc-val ${beCls}">${beDisp}</div><div class="ins-mc-sub">${beSub}</div></div>`;
+  html += `<div class="ins-metric-cell" data-def="book-eff-ratio"><div class="ins-mc-label">Book Efficiency</div><div class="ins-mc-val ${beCls}">${beDisp}</div><div class="ins-mc-sub">${beSub}</div></div>`;
 
   html += `</div></div>`;
 
@@ -3110,21 +3166,19 @@ function renderInsightsAdvanced(player, games, allGames) {
   html += `<div class="insights-section"><div class="insights-section-title">Performance Score</div>`;
   html += `<div class="ins-metric-grid">`;
 
-  // M7 — BPS
   const bpsDisp = bps !== null ? bps.toFixed(2) : (m.G < 20 || m.bidGames.length < 10) ? `Need more games` : '—';
   const bpsCls  = bps !== null ? (bps >= 1.5 ? 'gold' : bps >= 1.0 ? 'pos' : 'neg') : 'dim';
   const bpsBadge = bps !== null && bps >= 1.5 ? '<div class="ins-mc-badge">🏆 Elite</div>' : bps !== null && bps >= 1.0 ? '<div class="ins-mc-badge">Above avg</div>' : '';
-  html += `<div class="ins-metric-cell wide"><div class="ins-mc-label">M7 · Bid Performance Score</div><div class="ins-mc-val ${bpsCls}">${bpsDisp}</div><div class="ins-mc-sub">BFS × bid power vs league · 1.0 = average · Elite > 1.5</div>${bpsBadge}</div>`;
+  html += `<div class="ins-metric-cell wide" data-def="bps"><div class="ins-mc-label">Bid Performance Score</div><div class="ins-mc-val ${bpsCls}">${bpsDisp}</div><div class="ins-mc-sub">Bid frequency × bid power vs league · 1.0 = avg · Elite > 1.5</div>${bpsBadge}</div>`;
 
-  // Bid Ceiling from M6
   const ceilDisp = m.bidCeiling !== null ? `Bid ${m.bidCeiling}` : m.G >= 20 ? 'Not found yet' : '—';
   const ceilCls  = m.bidCeiling !== null ? (m.bidCeiling >= 5 ? 'pos' : m.bidCeiling <= 3 ? 'neg' : '') : 'dim';
-  html += `<div class="ins-metric-cell"><div class="ins-mc-label">Bid Ceiling</div><div class="ins-mc-val ${ceilCls}">${ceilDisp}</div><div class="ins-mc-sub">First bid level >33% set rate</div></div>`;
+  html += `<div class="ins-metric-cell" data-def="bid-ceiling"><div class="ins-mc-label">Bid Ceiling</div><div class="ins-mc-val ${ceilCls}">${ceilDisp}</div><div class="ins-mc-sub">First level >33% set rate</div></div>`;
 
   html += `</div></div>`;
 
-  // ── Section: M6 — Set Rate by Bid Level ──────────
-  html += `<div class="insights-section"><div class="insights-section-title">Bid Level Breakdown (M6)</div>`;
+  // ── Section: Bid Level Breakdown ──────────────────
+  html += `<div class="insights-section"><div class="insights-section-title">Bid Level Breakdown</div>`;
   html += `<div class="card" style="padding:10px 12px 8px;overflow-x:auto"><table class="srbl-table">
     <thead><tr><th>Bid</th><th>Attempts</th><th>Made</th><th>Set%</th><th>Win%</th><th></th></tr></thead><tbody>`;
   [1,2,3,4,5,6,7].forEach(b => {
@@ -3155,8 +3209,8 @@ function renderInsightsAdvanced(player, games, allGames) {
   html += `</tbody></table><div style="font-size:9px;color:var(--cream-dim);margin-top:4px;font-family:'DM Mono',monospace">* &lt;3 attempts — not enough data</div></div>`;
   html += `</div>`;
 
-  // ── Section: Partnership (M9/M10) ──────────────────
-  html += `<div class="insights-section"><div class="insights-section-title">Partnership Stats (M9 · M10)</div>`;
+  // ── Section: Partnership ──────────────────────────
+  html += `<div class="insights-section"><div class="insights-section-title">Partnership Stats</div>`;
   const pairEntries = partners.map(q => ({q, ...pairStats[q]})).filter(e => e.g > 0).sort((a,b) => b.g - a.g);
   if (!pairEntries.length) {
     html += `<div style="padding:12px;color:var(--cream-dim);font-size:13px">No partnership data yet</div>`;
@@ -3168,7 +3222,7 @@ function renderInsightsAdvanced(player, games, allGames) {
       const wrCls = wr !== null ? (wr >= 55 ? 'pos' : wr <= 40 ? 'neg' : '') : 'dim';
       const netDisp = `$${net >= 0 ? '+' : ''}${net.toFixed(0)}`;
       const netCls = net >= 0 ? 'color:var(--teal-pale)' : 'color:var(--red-bright)';
-      html += `<div class="ins-metric-cell">
+      html += `<div class="ins-metric-cell" data-def="${g >= 5 ? 'pwr-m9' : 'pwr-m9'}">
         <div class="ins-mc-label">With ${q}</div>
         <div class="ins-mc-val ${wrCls}">${wrDisp}</div>
         <div class="ins-mc-sub">${g} games · <span style="${netCls}">${netDisp}</span>${g < 5 ? ' (need ≥5)' : ''}</div>
@@ -3178,23 +3232,23 @@ function renderInsightsAdvanced(player, games, allGames) {
   }
   html += `</div>`;
 
-  // ── Section: Kamikaze (M8) ──────────────────────────
-  html += `<div class="insights-section"><div class="insights-section-title">Kamikaze Analysis (M8)</div>`;
+  // ── Section: Kamikaze ─────────────────────────────
+  html += `<div class="insights-section"><div class="insights-section-title">Kamikaze Analysis</div>`;
   if (m.kamGames.length < 2) {
-    html += `<div class="ins-metric-grid"><div class="ins-metric-cell full"><div class="ins-mc-label">KROI</div><div class="ins-mc-val dim">${m.kamGames.length === 0 ? 'Never attempted' : '1 attempt — need ≥2'}</div><div class="ins-mc-sub">Kamikaze carries 2× win/loss stakes</div></div></div>`;
+    html += `<div class="ins-metric-grid"><div class="ins-metric-cell full" data-def="kroi"><div class="ins-mc-label">Total Return (KROI)</div><div class="ins-mc-val dim">${m.kamGames.length === 0 ? 'Never attempted' : '1 attempt — need ≥2'}</div><div class="ins-mc-sub">Kamikaze carries 2× win/loss stakes</div></div></div>`;
   } else {
     html += `<div class="ins-metric-grid">`;
     const kroiDisp = `$${m.kroi >= 0 ? '+' : ''}${m.kroi.toFixed(2)}`;
     const kroiCls = m.kroi >= 0 ? 'pos' : 'neg';
-    html += `<div class="ins-metric-cell wide"><div class="ins-mc-label">KROI · Total return</div><div class="ins-mc-val ${kroiCls}">${kroiDisp}</div><div class="ins-mc-sub">${m.kamGames.length} attempts · ${m.kamMade.length} made</div></div>`;
+    html += `<div class="ins-metric-cell wide" data-def="kroi"><div class="ins-mc-label">Total Return</div><div class="ins-mc-val ${kroiCls}">${kroiDisp}</div><div class="ins-mc-sub">${m.kamGames.length} attempts · ${m.kamMade.length} made</div></div>`;
     const kwrDisp = Math.round(m.kwr * 100) + '%';
     const kwrCls = m.kwr >= 0.6 ? 'pos' : m.kwr < 0.4 ? 'neg' : '';
-    html += `<div class="ins-metric-cell"><div class="ins-mc-label">KAM Win Rate</div><div class="ins-mc-val ${kwrCls}">${kwrDisp}</div><div class="ins-mc-sub">${m.kamMade.length}/${m.kamGames.length} made</div></div>`;
+    html += `<div class="ins-metric-cell" data-def="kwr"><div class="ins-mc-label">Win Rate</div><div class="ins-mc-val ${kwrCls}">${kwrDisp}</div><div class="ins-mc-sub">${m.kamMade.length}/${m.kamGames.length} made</div></div>`;
     if (m.avgKamPayout !== null) {
-      html += `<div class="ins-metric-cell"><div class="ins-mc-label">Avg Payout</div><div class="ins-mc-val pos">$+${m.avgKamPayout.toFixed(2)}</div><div class="ins-mc-sub">Per made KAM</div></div>`;
+      html += `<div class="ins-metric-cell" data-def="kroi"><div class="ins-mc-label">Avg Payout</div><div class="ins-mc-val pos">$+${m.avgKamPayout.toFixed(2)}</div><div class="ins-mc-sub">Per made</div></div>`;
     }
     if (m.avgKamPenalty !== null) {
-      html += `<div class="ins-metric-cell"><div class="ins-mc-label">Avg Penalty</div><div class="ins-mc-val neg">$${m.avgKamPenalty.toFixed(2)}</div><div class="ins-mc-sub">Per missed KAM</div></div>`;
+      html += `<div class="ins-metric-cell" data-def="kroi"><div class="ins-mc-label">Avg Penalty</div><div class="ins-mc-val neg">$${m.avgKamPenalty.toFixed(2)}</div><div class="ins-mc-sub">Per missed</div></div>`;
     }
     html += `</div>`;
   }
@@ -3317,53 +3371,53 @@ function renderInsightsCard(player, games, allGames) {
     </div>
 
     <div class="pc-top-metrics">
-      <div class="pc-top-cell">
+      <div class="pc-top-cell" data-def="pba">
         <div class="pc-top-lbl">PBA</div>
         <div class="pc-top-val ${m.pba!==null?(m.pba>=0.65?'pos':m.pba<0.5?'neg':''):'dim'}">${pbaD}</div>
       </div>
-      <div class="pc-top-cell">
+      <div class="pc-top-cell" data-def="wbv">
         <div class="pc-top-lbl">WBV</div>
         <div class="pc-top-val ${m.wbv!==null?(m.wbv>=2.5?'pos':m.wbv<1.5?'neg':''):'dim'}">${wbvD}</div>
       </div>
-      <div class="pc-top-cell">
+      <div class="pc-top-cell" data-def="bps">
         <div class="pc-top-lbl">BPS</div>
         <div class="pc-top-val ${bps!==null?(bps>=1.5?'gold':bps>=1.0?'pos':'neg'):'dim'}">${bpsD}</div>
       </div>
-      <div class="pc-top-cell">
+      <div class="pc-top-cell" data-def="bid-success">
         <div class="pc-top-lbl">Win Rate</div>
         <div class="pc-top-val ${overallWR>=55?'pos':overallWR<45?'neg':''}">${overallWR}%</div>
       </div>
-      <div class="pc-top-cell">
+      <div class="pc-top-cell" data-def="confidence">
         <div class="pc-top-lbl">Games</div>
         <div class="pc-top-val">${m.G}</div>
       </div>
-      <div class="pc-top-cell">
+      <div class="pc-top-cell" data-def="pnm-m10">
         <div class="pc-top-lbl">Net $</div>
         <div class="pc-top-val ${totalMoney>=0?'pos':'neg'}">$${totalMoney>=0?'+':''}${totalMoney.toFixed(0)}</div>
       </div>
     </div>
 
     <div class="pc-row pc-row-5">
-      <div class="pc-cell"><div class="pc-cell-lbl">Bid Rate</div><div class="pc-cell-val">${brD}</div></div>
-      <div class="pc-cell"><div class="pc-cell-lbl">Avg Bid</div><div class="pc-cell-val">${abD}</div></div>
-      <div class="pc-cell"><div class="pc-cell-lbl">ASAB</div><div class="pc-cell-val ${m.asab!==null?(m.asab>0.5?'dim':m.asab<-0.5?'pos':''):'dim'}">${asabD}</div></div>
-      <div class="pc-cell"><div class="pc-cell-lbl">Set Rate</div><div class="pc-cell-val ${m.bidGames.length?((100-parseInt(setRD))>=60?'pos':parseInt(setRD)>=40?'neg':''):'dim'}">${setRD}</div></div>
-      <div class="pc-cell"><div class="pc-cell-lbl">Book Eff</div><div class="pc-cell-val ${m.be!==null?(m.be>=0.9?'pos':m.be<0.7?'neg':''):'dim'}">${beD}</div></div>
+      <div class="pc-cell" data-def="br-bri"><div class="pc-cell-lbl">Bid Rate</div><div class="pc-cell-val">${brD}</div></div>
+      <div class="pc-cell" data-def="avg-bid"><div class="pc-cell-lbl">Avg Bid</div><div class="pc-cell-val">${abD}</div></div>
+      <div class="pc-cell" data-def="asab"><div class="pc-cell-lbl">ASAB</div><div class="pc-cell-val ${m.asab!==null?(m.asab>0.5?'dim':m.asab<-0.5?'pos':''):'dim'}">${asabD}</div></div>
+      <div class="pc-cell" data-def="set-rate"><div class="pc-cell-lbl">Set Rate</div><div class="pc-cell-val ${m.bidGames.length?((100-parseInt(setRD))>=60?'pos':parseInt(setRD)>=40?'neg':''):'dim'}">${setRD}</div></div>
+      <div class="pc-cell" data-def="book-eff-ratio"><div class="pc-cell-lbl">Book Eff</div><div class="pc-cell-val ${m.be!==null?(m.be>=0.9?'pos':m.be<0.7?'neg':''):'dim'}">${beD}</div></div>
     </div>
 
     <div class="pc-row pc-row-3">
-      <div class="pc-cell"><div class="pc-cell-lbl">Bid Ceiling</div><div class="pc-cell-val ${m.bidCeiling!==null?(m.bidCeiling>=5?'pos':m.bidCeiling<=3?'neg':''):'dim'}">${ceilD}</div></div>
-      <div class="pc-cell"><div class="pc-cell-lbl">W/L</div><div class="pc-cell-val">${totalWins}/${m.G-totalWins}</div></div>
-      <div class="pc-cell"><div class="pc-cell-lbl">Bid %</div><div class="pc-cell-val">${m.bidGames.length ? Math.round(m.bidGames.length/m.G*100)+'%' : '—'}</div><div class="pc-cell-sub">${m.bidGames.length} bids</div></div>
+      <div class="pc-cell" data-def="bid-ceiling"><div class="pc-cell-lbl">Bid Ceiling</div><div class="pc-cell-val ${m.bidCeiling!==null?(m.bidCeiling>=5?'pos':m.bidCeiling<=3?'neg':''):'dim'}">${ceilD}</div></div>
+      <div class="pc-cell" data-def="bid-success"><div class="pc-cell-lbl">W/L</div><div class="pc-cell-val">${totalWins}/${m.G-totalWins}</div></div>
+      <div class="pc-cell" data-def="br-bri"><div class="pc-cell-lbl">Bid %</div><div class="pc-cell-val">${m.bidGames.length ? Math.round(m.bidGames.length/m.G*100)+'%' : '—'}</div><div class="pc-cell-sub">${m.bidGames.length} bids</div></div>
     </div>
 
     <div class="pc-row pc-row-2">
-      <div class="pc-cell">
+      <div class="pc-cell" data-def="pwr-m9">
         <div class="pc-cell-lbl">Best partner</div>
         <div class="pc-cell-val pos">${bestPartner ? bestPartner.q : '—'}</div>
         <div class="pc-cell-sub">${bestPartner ? Math.round(bestPartner.wr*100)+'% ('+bestPartner.g+'g)' : 'Need ≥5 games'}</div>
       </div>
-      <div class="pc-cell">
+      <div class="pc-cell" data-def="pwr-m9">
         <div class="pc-cell-lbl">Toughest partner</div>
         <div class="pc-cell-val neg">${worstPartner && worstPartner.q !== bestPartner?.q ? worstPartner.q : worstPartner ? worstPartner.q : '—'}</div>
         <div class="pc-cell-sub">${worstPartner ? Math.round(worstPartner.wr*100)+'% ('+worstPartner.g+'g)' : 'Need ≥5 games'}</div>
@@ -3371,10 +3425,10 @@ function renderInsightsCard(player, games, allGames) {
     </div>
 
     <div class="pc-row pc-row-4">
-      <div class="pc-cell"><div class="pc-cell-lbl">Bostons</div><div class="pc-cell-val ${bos>=2?'pos':''}">${bos}</div></div>
-      <div class="pc-cell"><div class="pc-cell-lbl">Cambridges</div><div class="pc-cell-val ${cam>=3?'gold':''}">${cam}</div></div>
-      <div class="pc-cell"><div class="pc-cell-lbl">KAM</div><div class="pc-cell-val">${kamD}</div></div>
-      <div class="pc-cell"><div class="pc-cell-lbl">KAM ROI</div><div class="pc-cell-val ${m.kroi!==null?(m.kroi>=0?'pos':'neg'):'dim'}">${kroiD}</div></div>
+      <div class="pc-cell" data-def="bostons"><div class="pc-cell-lbl">Bostons</div><div class="pc-cell-val ${bos>=2?'pos':''}">${bos}</div></div>
+      <div class="pc-cell" data-def="cambridges"><div class="pc-cell-lbl">Cambridges</div><div class="pc-cell-val ${cam>=3?'gold':''}">${cam}</div></div>
+      <div class="pc-cell" data-def="kamikaze"><div class="pc-cell-lbl">KAM</div><div class="pc-cell-val">${kamD}</div></div>
+      <div class="pc-cell" data-def="kroi"><div class="pc-cell-lbl">KAM ROI</div><div class="pc-cell-val ${m.kroi!==null?(m.kroi>=0?'pos':'neg'):'dim'}">${kroiD}</div></div>
     </div>
   </div>
   </div>`;
@@ -3686,6 +3740,12 @@ function sortLeaderboard(player, col) {
 load();
 renderSetup();
 if (S.session) { nav('play'); } else { nav('setup'); }
+
+// Event delegation: tap any [data-def] element to show its metric definition
+document.getElementById('insights-body').addEventListener('click', e => {
+  const el = e.target.closest('[data-def]');
+  if (el) showMetricDef(el.dataset.def);
+});
 
 function applyRemoteData(data) {
   if (!data) return;
