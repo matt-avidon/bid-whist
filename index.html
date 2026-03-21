@@ -938,7 +938,7 @@ body {
 .hist-chevron.collapsed { transform: rotate(-90deg); }
 .hist-body { overflow: hidden; }
 .hist-body.collapsed { display: none; }
-.hist-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.hist-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-top: 8px; }
 .games-table td, .games-table th { white-space: nowrap; }
 .games-table { font-size: 11px; }
 
@@ -1066,12 +1066,62 @@ body {
   color: var(--cream-dim);
   font-family: 'DM Mono', monospace;
   transition: all 0.3s;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
+.rotation-info:active { opacity: 0.8; }
 .rotation-info.flash {
   border-color: var(--gold);
   background: rgba(201,168,76,0.1);
   color: var(--gold);
 }
+/* ── Rotation schedule sheet ── */
+.rot-sched-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 900;
+  display: flex; align-items: flex-end;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+.rot-sched-overlay.open { opacity: 1; pointer-events: all; }
+.rot-sched-sheet {
+  background: var(--felt); border-radius: 16px 16px 0 0;
+  border-top: 1px solid var(--border);
+  width: 100%; padding: 20px 20px 32px;
+  transform: translateY(100%); transition: transform 0.3s cubic-bezier(.32,.72,0,1);
+  max-height: 80vh; overflow-y: auto;
+}
+.rot-sched-overlay.open .rot-sched-sheet { transform: translateY(0); }
+.rot-sched-title { font-size: 13px; font-weight: 600; color: var(--cream); margin-bottom: 16px; }
+.rot-sched-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 8px;
+  margin-bottom: 6px; border: 1px solid var(--border);
+  background: var(--felt-lighter);
+}
+.rot-sched-row.current {
+  border-color: var(--gold);
+  background: rgba(201,168,76,0.08);
+}
+.rot-sched-row.done { opacity: 0.45; }
+.rot-sched-num {
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  color: var(--gold-dim); min-width: 24px;
+}
+.rot-sched-row.current .rot-sched-num { color: var(--gold); }
+.rot-sched-partners {
+  flex: 1; font-size: 12px; color: var(--cream-dim);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.rot-sched-team { display: flex; align-items: center; gap: 6px; }
+.rot-sched-team-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; min-width: 12px; }
+.rot-sched-team-a { color: var(--gold-dim); }
+.rot-sched-team-b { color: var(--teal); }
+.rot-sched-badge {
+  font-size: 9px; font-family: 'DM Mono', monospace; padding: 1px 6px;
+  border-radius: 10px; font-weight: 500;
+}
+.rot-sched-row.current .rot-sched-badge { background: rgba(201,168,76,0.15); color: var(--gold); }
+.rot-sched-row.done .rot-sched-badge { background: var(--felt); color: var(--cream-dim); }
 
 /* ── iPhone / safe area support ── */
 body { -webkit-text-size-adjust: 100%; }
@@ -1492,9 +1542,10 @@ body { -webkit-text-size-adjust: 100%; }
 
     <div id="play-main" style="display:none">
 
-      <div class="rotation-info" id="rotation-info">
+      <div class="rotation-info" id="rotation-info" onclick="showRotSched()">
         <span>Rotation <span class="rot-num" id="rot-label"></span></span>
         <span id="rot-teams-label"></span>
+        <span style="font-size:9px;color:var(--cream-dim);margin-left:6px">▼</span>
       </div>
 
       <!-- Score panels -->
@@ -1785,6 +1836,38 @@ function getRots(ps) {
 function curRot() {
   const rots = getRots(S.players);
   return rots[S.session.rotationIdx % rots.length];
+}
+
+function showRotSched() {
+  if (!S.session) return;
+  const rots = getRots(S.players);
+  const rotN = S.session.rotationIdx % rots.length;
+  // Show all 3 rotations + lookahead for subsequent cycles
+  const totalRots = rots.length;
+  let html = '';
+  rots.forEach((r, i) => {
+    const isCurrent = i === rotN;
+    const isDone = i < rotN;
+    let cls = 'rot-sched-row';
+    if (isCurrent) cls += ' current';
+    else if (isDone) cls += ' done';
+    const badge = isCurrent ? '<span class="rot-sched-badge">Now</span>' : (isDone ? '<span class="rot-sched-badge">Done</span>' : '');
+    html += `<div class="${cls}">
+      <div class="rot-sched-num">${i+1}/${totalRots}</div>
+      <div class="rot-sched-partners">
+        <div class="rot-sched-team"><span class="rot-sched-team-label rot-sched-team-a">A</span><span>${r[0]} &amp; ${r[1]}</span></div>
+        <div class="rot-sched-team"><span class="rot-sched-team-label rot-sched-team-b">B</span><span>${r[2]} &amp; ${r[3]}</span></div>
+      </div>
+      ${badge}
+    </div>`;
+  });
+  document.getElementById('rot-sched-body').innerHTML = html;
+  const ov = document.getElementById('rot-sched-overlay');
+  ov.classList.add('open');
+}
+
+function closeRotSched() {
+  document.getElementById('rot-sched-overlay').classList.remove('open');
 }
 
 // ── Navigation ─────────────────────────────────────
@@ -2144,8 +2227,9 @@ function logGame() {
 
     S.allSessions.push({ games:[...s.games], money:{...s.money}, winTeam, endedAt:Date.now() });
 
-    // Rotate teams only when winning team both hit $20 target
-    const teamHit20 = winTeamPlayers.every(p => (s.money[p]||0) >= cfg.target);
+    // Rotate teams only when winning team's rotation-delta both hit the target
+    const rotBase = s.rotationBaseline || {};
+    const teamHit20 = winTeamPlayers.every(p => ((s.money[p]||0) - (rotBase[p]||0)) >= cfg.target);
     if (teamHit20) {
       showWinPopup('🏆', `${winTeam} reach $${cfg.target}!`,
         `+$${winPay.toFixed(2)}${losingInBlitz?' (blitz)':''}`,
@@ -2414,7 +2498,7 @@ function renderHistory() {
   // Default: collapse all past sessions on first render (current session stays open)
   sessions.forEach((sess, si) => {
     if (!sess.isCurrent) {
-      const key = sess.endedAt || ('past-'+si);
+      const key = String(sess.endedAt || ('past-'+si));
       if (!_collapsedSessions.has('__initialized_'+key)) {
         _collapsedSessions.add(key);
         _collapsedSessions.add('__initialized_'+key);
@@ -2427,7 +2511,7 @@ function renderHistory() {
     const label = sess.isCurrent ? 'Current session' : `Session ${all.length - si}`;
     const games = sess.games || [];
     const sessionDate = games.length && games[0].ts ? new Date(games[0].ts).toLocaleDateString() : '';
-    const key = sess.isCurrent ? 'current' : (sess.endedAt || ('past-'+si));
+    const key = sess.isCurrent ? 'current' : String(sess.endedAt || ('past-'+si));
     const collapsed = _collapsedSessions.has(key);
     const chevron = collapsed ? '▶' : '▼';
     html += `<div class="history-session">
@@ -3794,6 +3878,14 @@ if (db) {
   if (el) { el.textContent = '⬤ local'; el.style.color = 'var(--amber)'; }
 }
 </script>
+
+<!-- Rotation schedule sheet -->
+<div class="rot-sched-overlay" id="rot-sched-overlay" onclick="if(event.target===this)closeRotSched()">
+  <div class="rot-sched-sheet">
+    <div class="rot-sched-title">Rotation schedule</div>
+    <div id="rot-sched-body"></div>
+  </div>
+</div>
 
 <!-- Game recap toast -->
 <div class="game-toast" id="game-toast">
