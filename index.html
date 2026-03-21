@@ -1162,6 +1162,21 @@ body { -webkit-text-size-adjust: 100%; }
   font-family: 'Playfair Display', serif;
   font-size: 20px; color: var(--gold-pale); flex: 1;
 }
+
+/* ── Insights tab bar ── */
+.insights-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--border);
+  background: var(--felt-light); padding: 0 16px;
+}
+.insights-tab-btn {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--cream-dim); font-size: 12px; font-family: 'DM Sans', sans-serif;
+  font-weight: 500; padding: 9px 14px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s, border-color 0.15s;
+  letter-spacing: 0.02em;
+}
+.insights-tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
 .insights-archetype-badge {
   display: inline-block; padding: 3px 10px; border-radius: 20px;
   font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif;
@@ -1223,6 +1238,153 @@ body { -webkit-text-size-adjust: 100%; }
   transition: all 0.15s; -webkit-tap-highlight-color: transparent;
 }
 .sort-btn.active { background: var(--gold); border-color: var(--gold); color: var(--felt); font-weight: 600; }
+
+/* ── Advanced metrics & Player Card ── */
+.ins-confidence-wrap { margin-bottom: 16px; }
+.ins-confidence-label {
+  font-size: 10px; font-family: 'DM Mono', monospace; color: var(--cream-dim);
+  text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px;
+  display: flex; justify-content: space-between;
+}
+.ins-confidence-track {
+  height: 6px; background: var(--felt-lighter); border-radius: 3px;
+  border: 1px solid var(--border); overflow: hidden;
+}
+.ins-confidence-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+  transition: width 0.4s ease;
+}
+.ins-confidence-banner {
+  font-size: 11px; color: var(--amber); font-family: 'DM Mono', monospace;
+  background: var(--amber-bg); border: 1px solid rgba(224,160,32,0.3);
+  border-radius: var(--radius-sm); padding: 7px 12px; margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+/* Phase gate */
+.ins-phase-gate {
+  text-align: center; padding: 24px 16px; color: var(--cream-dim);
+  font-size: 13px; background: var(--felt-lighter);
+  border: 1px dashed var(--border); border-radius: var(--radius); line-height: 1.8;
+}
+.ins-phase-gate .gate-icon { font-size: 28px; margin-bottom: 8px; }
+.ins-phase-gate strong { color: var(--gold-pale); }
+
+/* Metric grid rows */
+.ins-metric-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px; margin-bottom: 12px;
+}
+.ins-metric-cell {
+  background: var(--felt-lighter); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 10px 8px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.ins-metric-cell.wide { grid-column: span 2; }
+.ins-metric-cell.full { grid-column: 1 / -1; }
+.ins-mc-label {
+  font-size: 9px; font-family: 'DM Mono', monospace; color: var(--gold-dim);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.ins-mc-val {
+  font-size: 20px; font-family: 'Playfair Display', serif; color: var(--cream);
+  line-height: 1.1;
+}
+.ins-mc-val.pos { color: var(--teal-pale); }
+.ins-mc-val.neg { color: var(--red-bright); }
+.ins-mc-val.gold { color: var(--gold-pale); }
+.ins-mc-val.dim { color: var(--cream-dim); font-size: 16px; }
+.ins-mc-sub {
+  font-size: 9px; font-family: 'DM Mono', monospace; color: var(--cream-dim);
+  line-height: 1.4; margin-top: 1px;
+}
+.ins-mc-badge {
+  display: inline-block; font-size: 9px; font-family: 'DM Mono', monospace;
+  padding: 2px 6px; border-radius: 10px; margin-top: 2px;
+  background: rgba(201,168,76,0.12); color: var(--gold); border: 1px solid var(--border);
+}
+
+/* SRBL table */
+.srbl-table {
+  width: 100%; border-collapse: collapse; font-size: 11px;
+}
+.srbl-table th {
+  font-size: 9px; font-family: 'DM Mono', monospace; color: var(--cream-dim);
+  text-transform: uppercase; padding: 4px 6px; text-align: center;
+  border-bottom: 1px solid var(--border); font-weight: 500;
+}
+.srbl-table td {
+  padding: 6px 6px; text-align: center; font-family: 'DM Mono', monospace;
+  font-size: 11px; border-bottom: 1px solid rgba(201,168,76,0.05);
+}
+.srbl-low { color: var(--teal-pale); }
+.srbl-mid { color: var(--amber); }
+.srbl-high { color: var(--red-bright); }
+.srbl-ceiling { background: rgba(224,160,32,0.08); border-left: 2px solid var(--amber); }
+
+/* ── Player Card ── */
+.player-card {
+  background: var(--felt-lighter); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); overflow: hidden;
+}
+.pc-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+}
+.pc-name {
+  font-family: 'Playfair Display', serif; font-size: 22px;
+  color: var(--gold-pale); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.pc-conf-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 6px;
+}
+.pc-conf-track {
+  flex: 1; height: 4px; background: var(--felt); border-radius: 2px;
+  border: 1px solid var(--border); overflow: hidden;
+}
+.pc-conf-fill {
+  height: 100%; background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+  border-radius: 2px;
+}
+.pc-conf-pct {
+  font-size: 9px; font-family: 'DM Mono', monospace; color: var(--cream-dim); white-space: nowrap;
+}
+.pc-top-metrics {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--border);
+}
+.pc-top-cell {
+  padding: 10px 10px 8px; border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 1px; min-width: 0;
+}
+.pc-top-cell:last-child { border-right: none; }
+.pc-top-lbl { font-size: 8px; font-family: 'DM Mono', monospace; color: var(--gold-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+.pc-top-val { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--cream); line-height: 1; }
+.pc-top-val.pos { color: var(--teal-pale); }
+.pc-top-val.neg { color: var(--red-bright); }
+.pc-top-val.gold { color: var(--gold-pale); }
+.pc-top-val.dim { color: var(--cream-dim); font-size: 13px; margin-top: 4px; }
+.pc-row {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  border-bottom: 1px solid var(--border);
+}
+.pc-row-4 { grid-template-columns: repeat(4, 1fr); }
+.pc-row-3 { grid-template-columns: repeat(3, 1fr); }
+.pc-row-2 { grid-template-columns: repeat(2, 1fr); }
+.pc-cell {
+  padding: 8px 10px; border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.pc-cell:last-child { border-right: none; }
+.pc-cell-lbl { font-size: 8px; font-family: 'DM Mono', monospace; color: var(--cream-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+.pc-cell-val { font-size: 13px; font-family: 'DM Mono', monospace; color: var(--cream); font-weight: 500; }
+.pc-cell-val.pos { color: var(--teal-pale); }
+.pc-cell-val.neg { color: var(--red-bright); }
+.pc-cell-val.gold { color: var(--gold); }
+.pc-cell-val.dim { color: var(--cream-dim); font-size: 11px; }
+.pc-cell-sub { font-size: 9px; font-family: 'DM Mono', monospace; color: var(--cream-dim); }
 
 /* Stat card clickable */
 .stat-card { cursor: pointer; transition: border-color 0.15s, transform 0.1s; }
@@ -1478,6 +1640,11 @@ body { -webkit-text-size-adjust: 100%; }
     <button class="insights-back" onclick="closeInsights()">← Back</button>
     <div class="insights-player-name" id="insights-player-name"></div>
     <div id="insights-archetype-badge"></div>
+  </div>
+  <div class="insights-tabs" id="insights-tabs">
+    <button class="insights-tab-btn active" data-tab="overview" onclick="setInsightsTab('overview')">Overview</button>
+    <button class="insights-tab-btn" data-tab="advanced" onclick="setInsightsTab('advanced')">🔬 Nerd</button>
+    <button class="insights-tab-btn" data-tab="card" onclick="setInsightsTab('card')">🃏 Card</button>
   </div>
   <div class="insights-body" id="insights-body"></div>
 </div>
@@ -2575,13 +2742,26 @@ function resetAll() {
 
 // ── Individual Insights ────────────────────────────
 let _insightsPlayer = null;
+let _insightsTab = 'overview';
+
+function setInsightsTab(tab) {
+  _insightsTab = tab;
+  document.querySelectorAll('.insights-tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  const overlay = document.getElementById('insights-overlay');
+  if (overlay) overlay.scrollTop = 0;
+  renderInsights();
+}
 
 function openInsights(player) {
+  _insightsTab = 'overview';
   _insightsPlayer = player;
   document.getElementById('insights-player-name').textContent = player;
   document.getElementById('insights-overlay').classList.add('open');
   document.getElementById('insights-overlay').scrollTop = 0;
   document.body.style.overflow = 'hidden';
+  document.querySelectorAll('.insights-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === 'overview'));
   renderInsights();
 }
 
@@ -2689,6 +2869,99 @@ function hideGameToast() {
   document.getElementById('game-toast').classList.remove('show');
 }
 
+// ── Advanced Metrics Computation ───────────────────
+
+// Compute all Phase-1 metrics for a single player from their game slice
+function computePlayerMetrics(p, playerGames) {
+  const bidGames  = playerGames.filter(g => g.bidder === p && !g.kamikaze);
+  const madeGames = bidGames.filter(g => g.madeIt);
+  const kamGames  = playerGames.filter(g => g.kamikaze && ((g.bidTeam==='A' ? g.teamA : g.teamB)||[]).includes(p));
+  const G = playerGames.length;
+
+  // M1 — Pure Bid Average
+  const pba = bidGames.length >= 10 ? madeGames.length / bidGames.length : null;
+
+  // M2 — Weighted Bid Value (uses ALL bids in denominator, only made games in numerator)
+  const wbv = bidGames.length >= 10
+    ? madeGames.reduce((s,g) => s + (g.bidHands - 6), 0) / bidGames.length
+    : null;
+
+  // M3 — Bid Rate + BRI
+  const br  = G >= 20 ? bidGames.length / G : null;
+  const bri = br !== null ? br / 0.25 : null;
+
+  // M4 — Average Bid
+  const ab  = bidGames.length >= 10
+    ? bidGames.reduce((s,g) => s + g.bid, 0) / bidGames.length
+    : null;
+
+  // M5 — Avg Score Above Bid
+  const asab = madeGames.length >= 10
+    ? madeGames.reduce((s,g) => s + (g.bidHands - 6 - g.bid), 0) / madeGames.length
+    : null;
+
+  // M6 — Set Rate by Bid Level + BidCeiling
+  const byBid = {};
+  bidGames.forEach(g => {
+    if (!byBid[g.bid]) byBid[g.bid] = {a:0, s:0};
+    byBid[g.bid].a++;
+    if (!g.madeIt) byBid[g.bid].s++;
+  });
+  const srbl = {};
+  [1,2,3,4,5,6,7].forEach(b => {
+    srbl[b] = byBid[b] && byBid[b].a >= 3 ? byBid[b].s / byBid[b].a : null;
+  });
+  let bidCeiling = null;
+  for (let b = 1; b <= 7; b++) {
+    if (srbl[b] !== null && srbl[b] > 0.33) { bidCeiling = b; break; }
+  }
+
+  // M8 — Kamikaze ROI
+  const kamMade  = kamGames.filter(g => g.kamOutcome === 'made');
+  const kamLost  = kamGames.filter(g => g.kamOutcome !== 'made');
+  const kroi = kamGames.length >= 2
+    ? kamGames.reduce((s,g) => s + (g.delta?.[p]||0), 0)
+    : null;
+  const kwr = kamGames.length >= 2 ? kamMade.length / kamGames.length : null;
+  const avgKamPayout  = kamMade.length  ? kamMade.reduce((s,g)  => s + (g.delta?.[p]||0), 0) / kamMade.length  : null;
+  const avgKamPenalty = kamLost.length  ? kamLost.reduce((s,g)  => s + (g.delta?.[p]||0), 0) / kamLost.length  : null;
+
+  // M9/M10 — Partnership stats (computed externally but stored here for card access)
+
+  // M11 — Book Efficiency
+  const beNum   = bidGames.reduce((s,g) => s + Math.max(0, g.bidHands - 6), 0);
+  const beDenom = bidGames.reduce((s,g) => s + g.bid, 0);
+  const be = bidGames.length >= 10 && beDenom > 0 ? beNum / beDenom : null;
+
+  // Confidence
+  const confidence = Math.min(G / 50, 1.0);
+
+  return {
+    G, bidGames, madeGames, kamGames, kamMade, kamLost,
+    pba, wbv, br, bri, ab, asab,
+    byBid, srbl, bidCeiling,
+    kroi, kwr, avgKamPayout, avgKamPenalty,
+    be, confidence
+  };
+}
+
+// M7 — BPS requires league-wide averages across all players
+function computeBPS(m, allMetrics) {
+  if (m.br === null || m.ab === null || m.pba === null) return null;
+  if (m.bidGames.length < 10 || m.G < 20) return null;
+
+  const bfs = m.br / 0.25;
+  const playerAbPba = m.ab * m.pba;
+
+  const leagueVals = allMetrics.filter(x => x.ab !== null && x.pba !== null).map(x => x.ab * x.pba);
+  if (leagueVals.length === 0) return null;
+
+  const leagueAvg = leagueVals.reduce((a,b) => a+b, 0) / leagueVals.length;
+  if (leagueAvg === 0) return null;
+
+  return bfs * (playerAbPba / leagueAvg);
+}
+
 // Deduplicate an array of game records by timestamp (ts). This guards against
 // allSessions snapshots overlapping — each 9-pt win pushes all session games so far.
 function uniqueGames(games) {
@@ -2741,6 +3014,374 @@ function buildChemMatrix(allGames) {
   return h;
 }
 
+// ── Advanced Metrics View ──────────────────────────
+function renderInsightsAdvanced(player, games, allGames) {
+  const body = document.getElementById('insights-body');
+  const m = computePlayerMetrics(player, games);
+
+  // Compute BPS — needs all players' metrics for league avg
+  const allPlayerNames = [...new Set(allGames.flatMap(g => [...(g.teamA||[]), ...(g.teamB||[])]))];
+  const allMetrics = allPlayerNames.map(p => {
+    const pg = allGames.filter(g => (g.teamA||[]).includes(p) || (g.teamB||[]).includes(p));
+    return computePlayerMetrics(p, pg);
+  });
+  const bps = computeBPS(m, allMetrics);
+
+  // Partnership stats for M9/M10
+  const partners = allPlayerNames.filter(p => p !== player);
+  const pairStats = {};
+  partners.forEach(q => { pairStats[q] = {g:0, w:0, net:0}; });
+  games.forEach(g => {
+    const myTeam = (g.teamA||[]).includes(player) ? (g.teamA||[]) : (g.teamB||[]);
+    const won = (() => {
+      const bt = g.bidTeam==='A' ? g.teamA : g.teamB;
+      const isBid = (bt||[]).includes(player);
+      return isBid ? (g.kamikaze ? g.kamOutcome==='made' : g.madeIt) : (g.kamikaze ? g.kamOutcome!=='made' : !g.madeIt);
+    })();
+    myTeam.filter(p => p !== player).forEach(q => {
+      if (!pairStats[q]) return;
+      pairStats[q].g++;
+      if (won) pairStats[q].w++;
+      pairStats[q].net += (g.delta?.[player]||0);
+    });
+  });
+
+  let html = '';
+
+  // Confidence block
+  const confPct = Math.round(m.confidence * 100);
+  html += `<div class="ins-confidence-wrap">
+    <div class="ins-confidence-label">
+      <span>Confidence</span><span>${confPct}%</span>
+    </div>
+    <div class="ins-confidence-track"><div class="ins-confidence-fill" style="width:${confPct}%"></div></div>
+  </div>`;
+  if (m.confidence < 0.5) {
+    html += `<div class="ins-confidence-banner">⚠ Stats are early — check back after more games (${m.G}/50 played)</div>`;
+  } else if (m.confidence < 1.0) {
+    html += `<div class="ins-confidence-banner">Building confidence — ${50 - m.G} more games to full confidence</div>`;
+  }
+
+  if (m.G < 20) {
+    html += `<div class="ins-phase-gate"><div class="gate-icon">🔒</div><strong>Phase 1 locked</strong><br>Need <strong>${20 - m.G}</strong> more games to unlock advanced metrics.<br>These require at least 20 games for meaningful results.</div>`;
+    body.innerHTML = html; return;
+  }
+
+  // ── Section: Bidding Fundamentals ──────────────────
+  html += `<div class="insights-section"><div class="insights-section-title">Bidding Fundamentals</div>`;
+  html += `<div class="ins-metric-grid">`;
+
+  // M1 — PBA
+  const pbaDisp = m.pba !== null ? m.pba.toFixed(3) : '—';
+  const pbaCls = m.pba !== null ? (m.pba >= 0.65 ? 'pos' : m.pba < 0.5 ? 'neg' : '') : 'dim';
+  html += `<div class="ins-metric-cell"><div class="ins-mc-label">M1 · PBA</div><div class="ins-mc-val ${pbaCls}">${pbaDisp}</div><div class="ins-mc-sub">Pure Bid Avg${m.bidGames.length < 10 ? ` (${m.bidGames.length}/10 bids)` : ''}</div></div>`;
+
+  // M4 — AB
+  const abLabel = m.ab === null ? '—' : m.ab < 2 ? 'Conservative' : m.ab < 3 ? 'Moderate' : m.ab < 4.5 ? 'Aggressive' : 'Very Aggressive';
+  const abDisp  = m.ab !== null ? m.ab.toFixed(1) : '—';
+  html += `<div class="ins-metric-cell"><div class="ins-mc-label">M4 · Avg Bid</div><div class="ins-mc-val">${abDisp}</div><div class="ins-mc-sub">${abLabel}</div></div>`;
+
+  // M3 — BR + BRI
+  const brDisp  = m.br !== null ? Math.round(m.br * 100) + '%' : '—';
+  const briDisp = m.bri !== null ? m.bri.toFixed(1) + '×' : '';
+  const briCls  = m.bri !== null ? (m.bri > 1.2 ? 'pos' : m.bri < 0.8 ? 'neg' : '') : 'dim';
+  html += `<div class="ins-metric-cell"><div class="ins-mc-label">M3 · Bid Rate</div><div class="ins-mc-val">${brDisp}</div><div class="ins-mc-sub">BRI <span class="${briCls}">${briDisp || '—'}</span> (1.0 = avg)</div></div>`;
+
+  // M5 — ASAB
+  const asabDisp = m.asab !== null ? (m.asab >= 0 ? '+' : '') + m.asab.toFixed(1) : '—';
+  const asabCls  = m.asab !== null ? (m.asab > 0.5 ? 'neg' : m.asab < -0.5 ? 'pos' : '') : 'dim';
+  const asabSub  = m.asab === null ? `Need ≥10 made` : m.asab > 0.5 ? 'Tends to underbid' : m.asab < -0.5 ? 'Accurate bidder' : 'Well calibrated';
+  html += `<div class="ins-metric-cell"><div class="ins-mc-label">M5 · ASAB</div><div class="ins-mc-val ${asabCls}">${asabDisp}</div><div class="ins-mc-sub">${asabSub}</div></div>`;
+
+  // M2 — WBV
+  const wbvDisp = m.wbv !== null ? m.wbv.toFixed(2) : '—';
+  const wbvCls  = m.wbv !== null ? (m.wbv >= 2.5 ? 'pos' : m.wbv < 1.5 ? 'neg' : '') : 'dim';
+  html += `<div class="ins-metric-cell"><div class="ins-mc-label">M2 · WBV</div><div class="ins-mc-val ${wbvCls}">${wbvDisp}</div><div class="ins-mc-sub">Pts per bid attempt</div></div>`;
+
+  // M11 — BE
+  const beDisp = m.be !== null ? m.be.toFixed(2) : '—';
+  const beCls  = m.be !== null ? (m.be >= 0.9 ? 'pos' : m.be < 0.7 ? 'neg' : '') : 'dim';
+  const beSub  = m.be !== null ? (m.be >= 1.0 ? 'Perfect delivery' : m.be >= 0.9 ? 'Efficient' : m.be < 0.7 ? 'Sets dragging' : 'Solid') : 'Need ≥10 bids';
+  html += `<div class="ins-metric-cell"><div class="ins-mc-label">M11 · Book Eff</div><div class="ins-mc-val ${beCls}">${beDisp}</div><div class="ins-mc-sub">${beSub}</div></div>`;
+
+  html += `</div></div>`;
+
+  // ── Section: Performance Score ──────────────────
+  html += `<div class="insights-section"><div class="insights-section-title">Performance Score</div>`;
+  html += `<div class="ins-metric-grid">`;
+
+  // M7 — BPS
+  const bpsDisp = bps !== null ? bps.toFixed(2) : (m.G < 20 || m.bidGames.length < 10) ? `Need more games` : '—';
+  const bpsCls  = bps !== null ? (bps >= 1.5 ? 'gold' : bps >= 1.0 ? 'pos' : 'neg') : 'dim';
+  const bpsBadge = bps !== null && bps >= 1.5 ? '<div class="ins-mc-badge">🏆 Elite</div>' : bps !== null && bps >= 1.0 ? '<div class="ins-mc-badge">Above avg</div>' : '';
+  html += `<div class="ins-metric-cell wide"><div class="ins-mc-label">M7 · Bid Performance Score</div><div class="ins-mc-val ${bpsCls}">${bpsDisp}</div><div class="ins-mc-sub">BFS × bid power vs league · 1.0 = average · Elite > 1.5</div>${bpsBadge}</div>`;
+
+  // Bid Ceiling from M6
+  const ceilDisp = m.bidCeiling !== null ? `Bid ${m.bidCeiling}` : m.G >= 20 ? 'Not found yet' : '—';
+  const ceilCls  = m.bidCeiling !== null ? (m.bidCeiling >= 5 ? 'pos' : m.bidCeiling <= 3 ? 'neg' : '') : 'dim';
+  html += `<div class="ins-metric-cell"><div class="ins-mc-label">Bid Ceiling</div><div class="ins-mc-val ${ceilCls}">${ceilDisp}</div><div class="ins-mc-sub">First bid level >33% set rate</div></div>`;
+
+  html += `</div></div>`;
+
+  // ── Section: M6 — Set Rate by Bid Level ──────────
+  html += `<div class="insights-section"><div class="insights-section-title">Bid Level Breakdown (M6)</div>`;
+  html += `<div class="card" style="padding:10px 12px 8px;overflow-x:auto"><table class="srbl-table">
+    <thead><tr><th>Bid</th><th>Attempts</th><th>Made</th><th>Set%</th><th>Win%</th><th></th></tr></thead><tbody>`;
+  [1,2,3,4,5,6,7].forEach(b => {
+    const d = m.byBid[b];
+    if (!d || d.a === 0) {
+      html += `<tr><td style="color:var(--gold-dim)">${b}</td><td colspan="5" style="color:var(--cream-dim)">—</td></tr>`;
+      return;
+    }
+    const setR = d.s / d.a;
+    const winR = 1 - setR;
+    const isCeil = m.bidCeiling === b;
+    const cls = setR > 0.5 ? 'srbl-high' : setR > 0.33 ? 'srbl-mid' : 'srbl-low';
+    const rowCls = isCeil ? 'srbl-ceiling' : '';
+    const ceilTag = isCeil ? '<span style="font-size:9px;color:var(--amber)"> ⚠Ceiling</span>' : '';
+    html += `<tr class="${rowCls}">
+      <td style="color:var(--gold-dim);font-weight:600">${b}${ceilTag}</td>
+      <td>${d.a < 3 ? `<span style="color:var(--cream-dim)">${d.a}*</span>` : d.a}</td>
+      <td style="color:var(--teal-pale)">${d.a - d.s}</td>
+      <td class="${cls}">${d.a >= 3 ? Math.round(setR*100)+'%' : '—'}</td>
+      <td class="${cls === 'srbl-low' ? 'srbl-low' : cls === 'srbl-mid' ? '' : 'srbl-high'}" style="${cls==='srbl-low'?'':'color:var(--cream)'}">${d.a >= 3 ? Math.round(winR*100)+'%' : '—'}</td>
+      <td style="padding-left:4px">
+        <div style="background:var(--felt-lighter);border-radius:2px;height:6px;width:60px;overflow:hidden">
+          <div style="height:6px;border-radius:2px;background:${setR>0.5?'var(--red-bright)':setR>0.33?'var(--amber)':'var(--teal)'};width:${Math.round(winR*100)}%"></div>
+        </div>
+      </td>
+    </tr>`;
+  });
+  html += `</tbody></table><div style="font-size:9px;color:var(--cream-dim);margin-top:4px;font-family:'DM Mono',monospace">* &lt;3 attempts — not enough data</div></div>`;
+  html += `</div>`;
+
+  // ── Section: Partnership (M9/M10) ──────────────────
+  html += `<div class="insights-section"><div class="insights-section-title">Partnership Stats (M9 · M10)</div>`;
+  const pairEntries = partners.map(q => ({q, ...pairStats[q]})).filter(e => e.g > 0).sort((a,b) => b.g - a.g);
+  if (!pairEntries.length) {
+    html += `<div style="padding:12px;color:var(--cream-dim);font-size:13px">No partnership data yet</div>`;
+  } else {
+    html += `<div class="ins-metric-grid" style="grid-template-columns:repeat(2,1fr)">`;
+    pairEntries.forEach(({q, g, w, net}) => {
+      const wr = g >= 5 ? Math.round(w/g*100) : null;
+      const wrDisp = wr !== null ? wr+'%' : `${w}W/${g-w}L`;
+      const wrCls = wr !== null ? (wr >= 55 ? 'pos' : wr <= 40 ? 'neg' : '') : 'dim';
+      const netDisp = `$${net >= 0 ? '+' : ''}${net.toFixed(0)}`;
+      const netCls = net >= 0 ? 'color:var(--teal-pale)' : 'color:var(--red-bright)';
+      html += `<div class="ins-metric-cell">
+        <div class="ins-mc-label">With ${q}</div>
+        <div class="ins-mc-val ${wrCls}">${wrDisp}</div>
+        <div class="ins-mc-sub">${g} games · <span style="${netCls}">${netDisp}</span>${g < 5 ? ' (need ≥5)' : ''}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  // ── Section: Kamikaze (M8) ──────────────────────────
+  html += `<div class="insights-section"><div class="insights-section-title">Kamikaze Analysis (M8)</div>`;
+  if (m.kamGames.length < 2) {
+    html += `<div class="ins-metric-grid"><div class="ins-metric-cell full"><div class="ins-mc-label">KROI</div><div class="ins-mc-val dim">${m.kamGames.length === 0 ? 'Never attempted' : '1 attempt — need ≥2'}</div><div class="ins-mc-sub">Kamikaze carries 2× win/loss stakes</div></div></div>`;
+  } else {
+    html += `<div class="ins-metric-grid">`;
+    const kroiDisp = `$${m.kroi >= 0 ? '+' : ''}${m.kroi.toFixed(2)}`;
+    const kroiCls = m.kroi >= 0 ? 'pos' : 'neg';
+    html += `<div class="ins-metric-cell wide"><div class="ins-mc-label">KROI · Total return</div><div class="ins-mc-val ${kroiCls}">${kroiDisp}</div><div class="ins-mc-sub">${m.kamGames.length} attempts · ${m.kamMade.length} made</div></div>`;
+    const kwrDisp = Math.round(m.kwr * 100) + '%';
+    const kwrCls = m.kwr >= 0.6 ? 'pos' : m.kwr < 0.4 ? 'neg' : '';
+    html += `<div class="ins-metric-cell"><div class="ins-mc-label">KAM Win Rate</div><div class="ins-mc-val ${kwrCls}">${kwrDisp}</div><div class="ins-mc-sub">${m.kamMade.length}/${m.kamGames.length} made</div></div>`;
+    if (m.avgKamPayout !== null) {
+      html += `<div class="ins-metric-cell"><div class="ins-mc-label">Avg Payout</div><div class="ins-mc-val pos">$+${m.avgKamPayout.toFixed(2)}</div><div class="ins-mc-sub">Per made KAM</div></div>`;
+    }
+    if (m.avgKamPenalty !== null) {
+      html += `<div class="ins-metric-cell"><div class="ins-mc-label">Avg Penalty</div><div class="ins-mc-val neg">$${m.avgKamPenalty.toFixed(2)}</div><div class="ins-mc-sub">Per missed KAM</div></div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  body.innerHTML = html;
+}
+
+// ── Player Card View ───────────────────────────────
+function renderInsightsCard(player, games, allGames) {
+  const body = document.getElementById('insights-body');
+  const m = computePlayerMetrics(player, games);
+
+  // BPS — needs all players
+  const allPlayerNames = [...new Set(allGames.flatMap(g => [...(g.teamA||[]), ...(g.teamB||[])]))];
+  const allMetrics = allPlayerNames.map(p => {
+    const pg = allGames.filter(g => (g.teamA||[]).includes(p) || (g.teamB||[]).includes(p));
+    return computePlayerMetrics(p, pg);
+  });
+  const bps = computeBPS(m, allMetrics);
+
+  // Partnership — best and worst
+  const partners = allPlayerNames.filter(p => p !== player);
+  const pairStats = {};
+  partners.forEach(q => { pairStats[q] = {g:0, w:0}; });
+  games.forEach(g => {
+    const myTeam = (g.teamA||[]).includes(player) ? (g.teamA||[]) : (g.teamB||[]);
+    const bt = g.bidTeam==='A' ? g.teamA : g.teamB;
+    const isBid = (bt||[]).includes(player);
+    const won = isBid ? (g.kamikaze ? g.kamOutcome==='made' : g.madeIt) : (g.kamikaze ? g.kamOutcome!=='made' : !g.madeIt);
+    myTeam.filter(p => p !== player).forEach(q => {
+      if (!pairStats[q]) return;
+      pairStats[q].g++;
+      if (won) pairStats[q].w++;
+    });
+  });
+  const pairsWithData = partners.filter(q => pairStats[q].g >= 5).map(q => {
+    const {g,w} = pairStats[q];
+    return {q, wr: w/g, g};
+  });
+  const bestPartner  = pairsWithData.length ? pairsWithData.reduce((a,b) => b.wr > a.wr ? b : a) : null;
+  const worstPartner = pairsWithData.length ? pairsWithData.reduce((a,b) => b.wr < a.wr ? b : a) : null;
+  const avgPairWR = pairsWithData.length ? pairsWithData.reduce((s,p) => s + p.wr, 0) / pairsWithData.length : null;
+
+  // Records
+  const totalWins = games.filter(g => {
+    const bt = g.bidTeam==='A' ? g.teamA : g.teamB;
+    const isBid = (bt||[]).includes(player);
+    return isBid ? (g.kamikaze ? g.kamOutcome==='made' : g.madeIt) : (g.kamikaze ? g.kamOutcome!=='made' : !g.madeIt);
+  }).length;
+  const overallWR = m.G ? Math.round(totalWins / m.G * 100) : 0;
+  const bos = games.filter(g => g.boston && ((g.bidTeam==='A'?g.teamA:g.teamB)||[]).includes(player)).length;
+  const cam = games.filter(g => g.cambridge && ((g.bidTeam==='A'?g.teamA:g.teamB)||[]).includes(player)).length;
+  const totalMoney = (S.allTimeMoney?.[player]||0) + (S.session?.money?.[player]||0);
+
+  // Archetype badge for card header
+  const robScore = (() => {
+    const bidTeamGames = games.filter(g => ((g.bidTeam==='A' ? g.teamA : g.teamB)||[]).includes(player));
+    const blitzBids = bidTeamGames.filter(g => g.blitz);
+    return blitzBids.length >= 3 ? Math.round(blitzBids.filter(g => g.madeIt).length / blitzBids.length * 100) : null;
+  })();
+  const defGames = games.filter(g => !((g.bidTeam==='A' ? g.teamA : g.teamB)||[]).includes(player));
+  const ancScore = defGames.length >= 5 ? Math.round(defGames.filter(g => {
+    const bt = g.bidTeam==='A' ? g.teamA : g.teamB;
+    const isBid = (bt||[]).includes(player);
+    return !isBid;
+  }).length === defGames.length ? 0 : defGames.filter(g => {
+    const bt2 = g.bidTeam==='A' ? g.teamA : g.teamB;
+    return !(bt2||[]).includes(player);
+  }).length >= 0 ? Math.round(defGames.filter(g => {
+    const bt3 = g.bidTeam==='A' ? g.teamA : g.teamB;
+    const isBid3 = (bt3||[]).includes(player);
+    return isBid3 ? (g.kamikaze ? g.kamOutcome==='made' : g.madeIt) : (g.kamikaze ? g.kamOutcome!=='made' : !g.madeIt);
+  }).length / defGames.length * 100) : 0) : null;
+
+  const gambNum = m.pba !== null && m.ab !== null ? m.ab * (1 - m.pba) : 0;
+  const gQ = gambNum >= 1.2 && (m.pba !== null ? (1-m.pba)*100 : 0) > 35;
+  const rQ = robScore !== null && robScore >= 55;
+  const aQ = ancScore !== null && ancScore >= 60;
+  const gR = gQ ? (gambNum - 1.2)/1.2 : -1;
+  const rR = rQ ? (robScore - 55)/55 : -1;
+  const aR = aQ ? (ancScore - 60)/60 : -1;
+  const best = Math.max(gR, rR, aR);
+  let archetype = 'Balanced', archEmoji = '⚖️';
+  if (best > -1) {
+    if (best === gR) { archetype = 'Gambler'; archEmoji = '🎲'; }
+    else if (best === rR) { archetype = 'Robinhood'; archEmoji = '🏹'; }
+    else { archetype = 'Anchor'; archEmoji = '⚓'; }
+  }
+
+  const confPct = Math.round(m.confidence * 100);
+
+  // ── Build card ──────────────────────────────────────
+  const pbaD  = m.pba !== null ? m.pba.toFixed(3) : '—';
+  const wbvD  = m.wbv !== null ? m.wbv.toFixed(2) : '—';
+  const bpsD  = bps  !== null ? bps.toFixed(2)  : '—';
+  const brD   = m.br  !== null ? Math.round(m.br*100)+'%' : '—';
+  const abD   = m.ab  !== null ? m.ab.toFixed(1) : '—';
+  const asabD = m.asab !== null ? (m.asab>=0?'+':'')+m.asab.toFixed(1) : '—';
+  const beD   = m.be  !== null ? m.be.toFixed(2) : '—';
+  const setRD = m.bidGames.length ? Math.round(m.bidGames.filter(g=>!g.madeIt).length/m.bidGames.length*100)+'%' : '—';
+  const ceilD = m.bidCeiling !== null ? `Bid ${m.bidCeiling}` : '—';
+  const kroiD = m.kroi !== null ? `$${m.kroi>=0?'+':''}${m.kroi.toFixed(0)}` : '—';
+  const kamD  = m.kamGames.length ? `${m.kamMade.length}/${m.kamGames.length}` : '—';
+
+  let html = `<div style="padding:4px">
+  <div class="player-card">
+    <div class="pc-header">
+      <div>
+        <div class="pc-name">${player}</div>
+        <div class="pc-conf-row">
+          <div class="pc-conf-track"><div class="pc-conf-fill" style="width:${confPct}%"></div></div>
+          <div class="pc-conf-pct">Confidence ${confPct}%</div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:22px;line-height:1">${archEmoji}</div>
+        <div style="font-size:10px;color:var(--cream-dim);font-family:'DM Mono',monospace;margin-top:3px">The ${archetype}</div>
+      </div>
+    </div>
+
+    <div class="pc-top-metrics">
+      <div class="pc-top-cell">
+        <div class="pc-top-lbl">PBA</div>
+        <div class="pc-top-val ${m.pba!==null?(m.pba>=0.65?'pos':m.pba<0.5?'neg':''):'dim'}">${pbaD}</div>
+      </div>
+      <div class="pc-top-cell">
+        <div class="pc-top-lbl">WBV</div>
+        <div class="pc-top-val ${m.wbv!==null?(m.wbv>=2.5?'pos':m.wbv<1.5?'neg':''):'dim'}">${wbvD}</div>
+      </div>
+      <div class="pc-top-cell">
+        <div class="pc-top-lbl">BPS</div>
+        <div class="pc-top-val ${bps!==null?(bps>=1.5?'gold':bps>=1.0?'pos':'neg'):'dim'}">${bpsD}</div>
+      </div>
+      <div class="pc-top-cell">
+        <div class="pc-top-lbl">Win Rate</div>
+        <div class="pc-top-val ${overallWR>=55?'pos':overallWR<45?'neg':''}">${overallWR}%</div>
+      </div>
+      <div class="pc-top-cell">
+        <div class="pc-top-lbl">Games</div>
+        <div class="pc-top-val">${m.G}</div>
+      </div>
+      <div class="pc-top-cell">
+        <div class="pc-top-lbl">Net $</div>
+        <div class="pc-top-val ${totalMoney>=0?'pos':'neg'}">$${totalMoney>=0?'+':''}${totalMoney.toFixed(0)}</div>
+      </div>
+    </div>
+
+    <div class="pc-row pc-row-5">
+      <div class="pc-cell"><div class="pc-cell-lbl">Bid Rate</div><div class="pc-cell-val">${brD}</div></div>
+      <div class="pc-cell"><div class="pc-cell-lbl">Avg Bid</div><div class="pc-cell-val">${abD}</div></div>
+      <div class="pc-cell"><div class="pc-cell-lbl">ASAB</div><div class="pc-cell-val ${m.asab!==null?(m.asab>0.5?'dim':m.asab<-0.5?'pos':''):'dim'}">${asabD}</div></div>
+      <div class="pc-cell"><div class="pc-cell-lbl">Set Rate</div><div class="pc-cell-val ${m.bidGames.length?((100-parseInt(setRD))>=60?'pos':parseInt(setRD)>=40?'neg':''):'dim'}">${setRD}</div></div>
+      <div class="pc-cell"><div class="pc-cell-lbl">Book Eff</div><div class="pc-cell-val ${m.be!==null?(m.be>=0.9?'pos':m.be<0.7?'neg':''):'dim'}">${beD}</div></div>
+    </div>
+
+    <div class="pc-row pc-row-3">
+      <div class="pc-cell"><div class="pc-cell-lbl">Bid Ceiling</div><div class="pc-cell-val ${m.bidCeiling!==null?(m.bidCeiling>=5?'pos':m.bidCeiling<=3?'neg':''):'dim'}">${ceilD}</div></div>
+      <div class="pc-cell"><div class="pc-cell-lbl">W/L</div><div class="pc-cell-val">${totalWins}/${m.G-totalWins}</div></div>
+      <div class="pc-cell"><div class="pc-cell-lbl">Bid %</div><div class="pc-cell-val">${m.bidGames.length ? Math.round(m.bidGames.length/m.G*100)+'%' : '—'}</div><div class="pc-cell-sub">${m.bidGames.length} bids</div></div>
+    </div>
+
+    <div class="pc-row pc-row-2">
+      <div class="pc-cell">
+        <div class="pc-cell-lbl">Best partner</div>
+        <div class="pc-cell-val pos">${bestPartner ? bestPartner.q : '—'}</div>
+        <div class="pc-cell-sub">${bestPartner ? Math.round(bestPartner.wr*100)+'% ('+bestPartner.g+'g)' : 'Need ≥5 games'}</div>
+      </div>
+      <div class="pc-cell">
+        <div class="pc-cell-lbl">Toughest partner</div>
+        <div class="pc-cell-val neg">${worstPartner && worstPartner.q !== bestPartner?.q ? worstPartner.q : worstPartner ? worstPartner.q : '—'}</div>
+        <div class="pc-cell-sub">${worstPartner ? Math.round(worstPartner.wr*100)+'% ('+worstPartner.g+'g)' : 'Need ≥5 games'}</div>
+      </div>
+    </div>
+
+    <div class="pc-row pc-row-4">
+      <div class="pc-cell"><div class="pc-cell-lbl">Bostons</div><div class="pc-cell-val ${bos>=2?'pos':''}">${bos}</div></div>
+      <div class="pc-cell"><div class="pc-cell-lbl">Cambridges</div><div class="pc-cell-val ${cam>=3?'gold':''}">${cam}</div></div>
+      <div class="pc-cell"><div class="pc-cell-lbl">KAM</div><div class="pc-cell-val">${kamD}</div></div>
+      <div class="pc-cell"><div class="pc-cell-lbl">KAM ROI</div><div class="pc-cell-val ${m.kroi!==null?(m.kroi>=0?'pos':'neg'):'dim'}">${kroiD}</div></div>
+    </div>
+  </div>
+  </div>`;
+
+  body.innerHTML = html;
+}
+
 function renderInsights() {
   const player = _insightsPlayer;
   if (!player) return;
@@ -2756,6 +3397,10 @@ function renderInsights() {
     badgeEl.innerHTML = '';
     return;
   }
+
+  // Dispatch to the active tab renderer
+  if (_insightsTab === 'advanced') { renderInsightsAdvanced(player, games, allGames); return; }
+  if (_insightsTab === 'card')     { renderInsightsCard(player, games, allGames); return; }
 
   // ── Section 1: Core Bidding ─────────────────────────
   const bidGames = games.filter(g => g.bidder === player && !g.kamikaze);
