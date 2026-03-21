@@ -132,7 +132,7 @@ body {
 }
 
 /* ── Score Panel ── */
-.score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: stretch; }
 .score-panel {
   background: var(--felt-lighter);
   border: 1px solid var(--border);
@@ -140,6 +140,7 @@ body {
   padding: 10px 12px;
   position: relative;
   transition: border-color 0.2s, background 0.2s;
+  display: flex; flex-direction: column;
 }
 /* Team A = gold theme, Team B = teal theme */
 .score-panel.team-a { border-color: rgba(201,168,76,0.35); }
@@ -214,36 +215,63 @@ body {
   margin-top: 2px;
 }
 .score-pips {
-  display: flex; gap: 3px; flex-wrap: wrap;
-  margin-top: 5px;
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10px, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 3px;
+  margin-top: 6px;
+  min-height: 28px;
 }
 .pip {
-  width: 10px; height: 10px;
-  border-radius: 2px;
-  background: var(--cream-faint);
-  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.09);
   transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+  min-width: 0; min-height: 0;
 }
-.pip.on-a { background: var(--gold); border-color: var(--gold); }
-.pip.on-b { background: var(--teal); border-color: var(--teal); }
-.pip.neg { background: var(--red); border-color: var(--red); }
+/* Subtle inner card-frame */
+.pip::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.pip.on-a {
+  background: linear-gradient(160deg, #d4a832 0%, #c9a84c 45%, #9a6e1a 100%);
+  border-color: rgba(201,168,76,0.6);
+  box-shadow: 0 1px 4px rgba(201,168,76,0.25), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.pip.on-a::before { border-color: rgba(255,255,255,0.18); }
+.pip.on-b {
+  background: linear-gradient(160deg, #34c4aa 0%, #27ae80 45%, #1a7a5a 100%);
+  border-color: rgba(46,184,160,0.6);
+  box-shadow: 0 1px 4px rgba(46,184,160,0.25), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.pip.on-b::before { border-color: rgba(255,255,255,0.18); }
+.pip.neg {
+  background: linear-gradient(160deg, #e74c3c 0%, #c0392b 100%);
+  border-color: rgba(231,76,60,0.6);
+  box-shadow: 0 1px 4px rgba(231,76,60,0.2);
+}
+.pip.neg::before { border-color: rgba(255,255,255,0.12); }
 .blitz-tag {
-  display: inline-block;
+  position: absolute;
+  top: 8px; right: 8px;
   background: var(--red);
   color: #fff;
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  padding: 2px 7px;
+  padding: 2px 6px;
   border-radius: 20px;
   font-family: 'DM Mono', monospace;
-}
-/* Fixed-height slot so the blitz pill never stretches the score box */
-.blitz-badge-row {
-  height: 20px;
-  display: flex; align-items: center;
-  margin-top: 5px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
 }
 
 /* ── Money Table ── */
@@ -2468,22 +2496,22 @@ function renderPlay() {
   const pctB = Math.max(0, Math.min(100, blitzB ? 0 : (s.scoreB/cfg.pts*100)));
   document.getElementById('score-panels').innerHTML = `
     <div class="score-panel team-a ${blitzA?'blitz':s.scoreA>=cfg.pts?'winner':''}">
+      ${blitzA?'<span class="blitz-tag">Blitz</span>':''}
       <div class="score-team-label">Team A</div>
       <div class="score-names">${rot[0]} & ${rot[1]}</div>
       <div class="score-big ${blitzA?'blitz-num':''}">${s.scoreA}</div>
       <div class="score-target">of ${cfg.pts} pts</div>
       <div class="score-bar-wrap"><div class="score-bar-fill" style="width:${pctA}%"></div></div>
       <div class="score-pips">${pips(s.scoreA, cfg.pts, 'a')}</div>
-      <div class="blitz-badge-row">${blitzA?'<span class="blitz-tag">Blitz</span>':''}</div>
     </div>
     <div class="score-panel team-b ${blitzB?'blitz':s.scoreB>=cfg.pts?'winner':''}">
+      ${blitzB?'<span class="blitz-tag">Blitz</span>':''}
       <div class="score-team-label">Team B</div>
       <div class="score-names">${rot[2]} & ${rot[3]}</div>
       <div class="score-big ${blitzB?'blitz-num':''}">${s.scoreB}</div>
       <div class="score-target">of ${cfg.pts} pts</div>
       <div class="score-bar-wrap"><div class="score-bar-fill" style="width:${pctB}%"></div></div>
       <div class="score-pips">${pips(s.scoreB, cfg.pts, 'b')}</div>
-      <div class="blitz-badge-row">${blitzB?'<span class="blitz-tag">Blitz</span>':''}</div>
     </div>`;
 
   // Sticky score bar
