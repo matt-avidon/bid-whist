@@ -1088,6 +1088,113 @@ body { -webkit-text-size-adjust: 100%; }
   .player-btn { padding: 9px 14px; font-size: 13px; }
 }
 .rotation-info .rot-num { color: var(--gold); font-weight: 500; }
+
+/* ── Individual Insights overlay ── */
+.insights-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: var(--felt);
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(201,168,76,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 100%, rgba(39,174,96,0.04) 0%, transparent 60%);
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.insights-overlay.open { transform: translateX(0); }
+.insights-header {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--felt-light);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  display: flex; align-items: center; gap: 10px;
+}
+.insights-back {
+  background: none; border: 1px solid var(--border-strong);
+  color: var(--gold); font-size: 13px;
+  cursor: pointer; padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-family: 'DM Sans', sans-serif; font-weight: 500;
+  -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+  transition: all 0.15s;
+}
+.insights-back:hover { background: var(--cream-faint); }
+.insights-player-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px; color: var(--gold-pale); flex: 1;
+}
+.insights-archetype-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif;
+  flex-shrink: 0;
+}
+.arch-gambler { background: rgba(201,168,76,0.18); color: var(--gold-pale); border: 1px solid var(--border-strong); }
+.arch-robinhood { background: rgba(46,184,160,0.18); color: var(--teal-pale); border: 1px solid var(--teal-border); }
+.arch-anchor { background: rgba(39,174,96,0.15); color: var(--green-bright); border: 1px solid rgba(39,174,96,0.3); }
+.arch-balanced { background: var(--cream-faint); color: var(--cream-dim); border: 1px solid var(--border); }
+.insights-body { padding: 16px 20px 100px; max-width: 680px; margin: 0 auto; }
+.insights-section { margin-bottom: 16px; }
+.insights-section-title {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--gold-dim); font-family: 'DM Mono', monospace;
+  margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+}
+.insights-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; border-bottom: 1px solid rgba(201,168,76,0.07);
+}
+.insights-row:last-child { border-bottom: none; }
+.insights-key { font-size: 12px; color: var(--cream-dim); flex: 1; padding-right: 8px; }
+.insights-val { font-size: 12px; font-weight: 500; font-family: 'DM Mono', monospace; text-align: right; }
+.insights-val.pos { color: var(--green-bright); }
+.insights-val.neg { color: var(--red-bright); }
+.insights-val.gold { color: var(--gold); }
+.insights-val.amb { color: var(--amber); }
+.insights-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.insights-mini {
+  background: var(--felt-lighter); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+}
+.insights-mini-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); font-family: 'DM Mono', monospace; margin-bottom: 4px; }
+.insights-mini-val { font-size: 22px; font-family: 'Playfair Display', serif; color: var(--cream); line-height: 1.1; }
+.insights-mini-val.pos { color: var(--green-bright); }
+.insights-mini-val.neg { color: var(--red-bright); }
+.insights-mini-val.gold { color: var(--gold-pale); }
+.insights-mini-sub { font-size: 10px; color: var(--cream-dim); font-family: 'DM Mono', monospace; margin-top: 2px; }
+
+/* Partner matrix */
+.pmatrix-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 8px; }
+.pmatrix { border-collapse: collapse; font-size: 11px; font-family: 'DM Mono', monospace; width: 100%; }
+.pmatrix th { padding: 5px 8px; font-size: 9px; letter-spacing: 0.08em; color: var(--gold-dim); text-transform: uppercase; text-align: center; }
+.pmatrix td { padding: 7px 8px; text-align: center; border: 1px solid rgba(201,168,76,0.1); }
+.pmc-self { color: var(--border); }
+.pmc-strong { background: rgba(39,174,96,0.22); color: var(--green-bright); font-weight: 500; }
+.pmc-good { background: rgba(39,174,96,0.1); color: var(--green-bright); }
+.pmc-neutral { background: var(--cream-faint); color: var(--cream-dim); }
+.pmc-weak { background: rgba(192,57,43,0.12); color: var(--red-bright); }
+.pmc-none { color: var(--border); }
+
+/* Leaderboard sort */
+.sort-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.sort-btn {
+  background: var(--felt-lighter); border: 1px solid var(--border);
+  border-radius: 20px; color: var(--cream-dim);
+  font-size: 10px; font-family: 'DM Mono', monospace; letter-spacing: 0.05em;
+  padding: 4px 12px; cursor: pointer;
+  transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+}
+.sort-btn.active { background: var(--gold); border-color: var(--gold); color: var(--felt); font-weight: 600; }
+
+/* Stat card clickable */
+.stat-card { cursor: pointer; transition: border-color 0.15s, transform 0.1s; }
+.stat-card:hover { border-color: rgba(201,168,76,0.5); }
+.stat-card:active { transform: scale(0.97); }
+.stat-tap-hint {
+  font-size: 9px; color: var(--gold-dim); font-family: 'DM Mono', monospace;
+  margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border);
+  text-align: center; letter-spacing: 0.05em; text-transform: uppercase;
+}
 </style>
 </head>
 <body>
@@ -1275,6 +1382,16 @@ body { -webkit-text-size-adjust: 100%; }
     <button class="btn-danger" onclick="resetAll()">Reset all data</button>
   </div>
 
+</div>
+
+<!-- Individual Insights Overlay -->
+<div class="insights-overlay" id="insights-overlay">
+  <div class="insights-header">
+    <button class="insights-back" onclick="closeInsights()">← Back</button>
+    <div class="insights-player-name" id="insights-player-name"></div>
+    <div id="insights-archetype-badge"></div>
+  </div>
+  <div class="insights-body" id="insights-body"></div>
 </div>
 
 <!-- Win popup -->
@@ -2112,7 +2229,7 @@ function renderStats() {
     const bp = st.bids ? Math.round(st.bidsMade/st.bids*100)+'%' : '—';
     const kam = st.kamA ? `${st.kamM}/${st.kamA}` : '—';
     const mCls = m>=0?'color:var(--green-bright)':'color:var(--red-bright)';
-    html += `<div class="stat-card">
+    html += `<div class="stat-card" onclick="openInsights('${p}')">
       <div class="stat-player">${p}</div>
       <div class="stat-row"><span class="stat-key">Money (all-time)</span><span class="stat-val" style="${mCls}">$${m.toFixed(2)}</span></div>
       <div class="stat-row"><span class="stat-key">Win rate</span><span class="stat-val">${wr}</span></div>
@@ -2123,6 +2240,7 @@ function renderStats() {
       <div class="stat-row"><span class="stat-key">Bostons</span><span class="stat-val" style="color:var(--green-bright)">${st.bostons||0}</span></div>
       <div class="stat-row"><span class="stat-key">Cambridges</span><span class="stat-val" style="color:var(--amber)">${st.cams||0}</span></div>
       <div class="stat-row"><span class="stat-key">Kamikaze</span><span class="stat-val">${kam}</span></div>
+      <div class="stat-tap-hint">Tap for full insights →</div>
     </div>`;
   });
   html += '</div>';
@@ -2280,6 +2398,258 @@ function resetAll() {
   if (!confirm('Clear all data?')) return;
   S.session=null; S.allSessions=[]; S.allTimeStats={}; S.allTimeMoney={};
   save(); nav('setup');
+}
+
+// ── Individual Insights ────────────────────────────
+let _insightsPlayer = null;
+
+function openInsights(player) {
+  _insightsPlayer = player;
+  document.getElementById('insights-player-name').textContent = player;
+  document.getElementById('insights-overlay').classList.add('open');
+  document.getElementById('insights-overlay').scrollTop = 0;
+  document.body.style.overflow = 'hidden';
+  renderInsights();
+}
+
+function closeInsights() {
+  document.getElementById('insights-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  _insightsPlayer = null;
+}
+
+function insRow(key, val, cls) {
+  return `<div class="insights-row"><span class="insights-key">${key}</span><span class="insights-val${cls?' '+cls:''}">${val}</span></div>`;
+}
+
+function buildChemMatrix(allGames) {
+  const ps = S.players.slice(0, 4);
+  const pairSt = {};
+  const pk = (a, b) => [a,b].sort().join('|');
+  allGames.forEach(g => {
+    [[g.teamA, g.bidTeam==='A'], [g.teamB, g.bidTeam==='B']].forEach(([team, isBid]) => {
+      if (!team || team.length < 2) return;
+      const won = isBid ? (g.kamikaze ? g.kamOutcome==='made' : g.madeIt) : (g.kamikaze ? g.kamOutcome!=='made' : !g.madeIt);
+      const k = pk(team[0], team[1]);
+      if (!pairSt[k]) pairSt[k] = {g:0, w:0};
+      pairSt[k].g++; if (won) pairSt[k].w++;
+    });
+  });
+  let h = `<table class="pmatrix"><thead><tr><th></th>`;
+  ps.forEach(p => { h += `<th>${p.length > 6 ? p.slice(0,6) : p}</th>`; });
+  h += `</tr></thead><tbody>`;
+  ps.forEach(a => {
+    h += `<tr><td style="font-size:10px;color:var(--cream-dim);text-align:left;padding-right:4px;white-space:nowrap">${a}</td>`;
+    ps.forEach(b => {
+      if (a === b) { h += `<td class="pmc-self">—</td>`; return; }
+      const st = pairSt[pk(a,b)];
+      if (!st || st.g === 0) { h += `<td class="pmc-none">—</td>`; return; }
+      const wr = Math.round(st.w/st.g*100);
+      const cls = wr >= 65 ? 'pmc-strong' : wr >= 52 ? 'pmc-good' : wr <= 35 ? 'pmc-weak' : 'pmc-neutral';
+      h += `<td class="${cls}">${wr}%</td>`;
+    });
+    h += `</tr>`;
+  });
+  h += `</tbody></table>`;
+  return h;
+}
+
+function renderInsights() {
+  const player = _insightsPlayer;
+  if (!player) return;
+
+  const allGames = [...(S.allSessions||[]).flatMap(s => s.games||[]), ...(S.session?.games||[])];
+  const games = allGames.filter(g => (g.teamA||[]).includes(player) || (g.teamB||[]).includes(player));
+
+  const body = document.getElementById('insights-body');
+  const badgeEl = document.getElementById('insights-archetype-badge');
+
+  if (games.length === 0) {
+    body.innerHTML = `<div class="empty" style="padding-top:60px"><div class="empty-icon">♣</div><div class="empty-title">No data yet</div><div class="empty-sub">${player} hasn't played any recorded games.</div></div>`;
+    badgeEl.innerHTML = '';
+    return;
+  }
+
+  // ── Section 1: Core Bidding ─────────────────────────
+  const bidGames = games.filter(g => g.bidder === player && !g.kamikaze);
+  const kamGames = games.filter(g => g.kamikaze && ((g.bidTeam==='A' ? g.teamA : g.teamB)||[]).includes(player));
+
+  // Win/loss helper
+  function didWin(g, p) {
+    const bt = g.bidTeam==='A' ? g.teamA : g.teamB;
+    const isBid = (bt||[]).includes(p);
+    return isBid ? (g.kamikaze ? g.kamOutcome==='made' : g.madeIt) : (g.kamikaze ? g.kamOutcome!=='made' : !g.madeIt);
+  }
+
+  const totalWins = games.filter(g => didWin(g, player)).length;
+  const overallWR = Math.round(totalWins / games.length * 100);
+  const money = (S.allTimeMoney?.[player]||0) + (S.session?.money?.[player]||0);
+
+  const bidRate = games.length ? Math.round(bidGames.length / games.length * 100) : 0;
+  const avgBid = bidGames.length ? bidGames.reduce((s,g) => s+g.bid, 0) / bidGames.length : 0;
+  const bidsMade = bidGames.filter(g => g.madeIt).length;
+  const bidSucc = bidGames.length ? Math.round(bidsMade / bidGames.length * 100) : null;
+  const setRate = bidGames.length ? Math.round((bidGames.length - bidsMade) / bidGames.length * 100) : null;
+
+  const madeGames = bidGames.filter(g => g.madeIt);
+  const avgMargin = madeGames.length ? (madeGames.reduce((s,g) => s + (g.bidHands - 6 - g.bid), 0) / madeGames.length) : null;
+
+  // Set rate by bid level
+  const byBid = {};
+  bidGames.forEach(g => {
+    if (!byBid[g.bid]) byBid[g.bid] = {a:0, s:0};
+    byBid[g.bid].a++;
+    if (!g.madeIt) byBid[g.bid].s++;
+  });
+  const setByBidStr = [1,2,3,4,5,6,7].filter(b => byBid[b] && byBid[b].a >= 1).map(b => {
+    const r = byBid[b];
+    return `${b}: ${Math.round(r.s/r.a*100)}%`;
+  }).join(' · ');
+
+  // Blitz / clutch
+  const bidTeamGames = games.filter(g => ((g.bidTeam==='A' ? g.teamA : g.teamB)||[]).includes(player));
+  const blitzBidGames = bidTeamGames.filter(g => g.blitz);
+  const clutchWins = blitzBidGames.filter(g => g.madeIt).length;
+  const clutchScore = blitzBidGames.length >= 3 ? Math.round(clutchWins / blitzBidGames.length * 100) : null;
+
+  // Kamikaze
+  const kamMoney = kamGames.reduce((s,g) => s + (g.delta?.[player]||0), 0);
+  const kamROI = kamGames.length ? (kamMoney / kamGames.length) : null;
+
+  // Hot hand
+  let maxStreak = 0, curStreak = 0;
+  games.forEach(g => {
+    if (didWin(g, player)) { curStreak++; maxStreak = Math.max(maxStreak, curStreak); }
+    else curStreak = 0;
+  });
+
+  // Favorite bid
+  let favBid = null, favBidCount = 0;
+  Object.entries(byBid).forEach(([b, r]) => { if (r.a > favBidCount) { favBidCount = r.a; favBid = b; } });
+
+  // Book efficiency: avg extra hands above minimum when making
+  const bookEff = madeGames.length ? (madeGames.reduce((s,g) => s + (g.bidHands - (g.bid + 6)), 0) / madeGames.length) : null;
+
+  // ── Section 2: Partnership ──────────────────────────
+  const partners = S.players.filter(p => p !== player);
+  const pStats = {};
+  partners.forEach(q => { pStats[q] = {g:0, w:0, net:0, sets:0}; });
+
+  games.forEach(g => {
+    const isA = (g.teamA||[]).includes(player);
+    const myTeam = isA ? (g.teamA||[]) : (g.teamB||[]);
+    const isBidTeam = isA ? g.bidTeam==='A' : g.bidTeam==='B';
+    const won = didWin(g, player);
+    myTeam.filter(p => p !== player).forEach(q => {
+      if (!pStats[q]) return;
+      pStats[q].g++;
+      if (won) pStats[q].w++;
+      pStats[q].net += (g.delta?.[player]||0);
+      if (isBidTeam && !g.madeIt && !g.kamikaze) pStats[q].sets++;
+    });
+  });
+
+  // ── Section 3: Archetypes ──────────────────────────
+  // Robinhood: win rate when bidding from blitz (negative score)
+  const robinhoodScore = blitzBidGames.length >= 3
+    ? Math.round(blitzBidGames.filter(g => g.madeIt).length / blitzBidGames.length * 100)
+    : null;
+
+  // Gambler Score: Avg Bid × Set Rate — high bids + high risk = gambler
+  const gamblerScore = (bidGames.length >= 5 && avgBid > 0 && setRate !== null)
+    ? (avgBid * setRate / 100).toFixed(2)
+    : null;
+
+  // Anchor: defensive win rate (not on bidding team)
+  const defGames = games.filter(g => !((g.bidTeam==='A' ? g.teamA : g.teamB)||[]).includes(player));
+  const anchorScore = defGames.length >= 5
+    ? Math.round(defGames.filter(g => didWin(g, player)).length / defGames.length * 100)
+    : null;
+
+  // Momentum: win rate after win vs after loss
+  let aWW=0, aWTotal=0, aLW=0, aLTotal=0;
+  for (let i=1; i<games.length; i++) {
+    if (didWin(games[i-1], player)) { aWTotal++; if (didWin(games[i], player)) aWW++; }
+    else { aLTotal++; if (didWin(games[i], player)) aLW++; }
+  }
+  const momentumDiff = (aWTotal >= 5 && aLTotal >= 5)
+    ? Math.round((aWW/aWTotal - aLW/aLTotal)*100)
+    : null;
+
+  // Archetype assignment
+  let archetype = 'Balanced', archClass = 'arch-balanced';
+  const gamblerNum = parseFloat(gamblerScore) || 0;
+  if (gamblerNum >= 0.8) { archetype = 'Gambler'; archClass = 'arch-gambler'; }
+  else if (robinhoodScore !== null && robinhoodScore >= 55 && blitzBidGames.length >= 3) { archetype = 'Robinhood'; archClass = 'arch-robinhood'; }
+  else if (anchorScore !== null && anchorScore >= 60 && defGames.length >= 5) { archetype = 'Anchor'; archClass = 'arch-anchor'; }
+
+  badgeEl.innerHTML = `<div class="insights-archetype-badge ${archClass}">${archetype}</div>`;
+
+  // ── Section 4: Records (from raw game data) ─────────
+  const bostonCount = games.filter(g => g.boston && (g.bidTeam==='A' ? g.teamA : g.teamB||[]).includes(player)).length;
+  const camCount = games.filter(g => g.cambridge && (g.bidTeam==='A' ? g.teamA : g.teamB||[]).includes(player)).length;
+  const totalSets = bidGames.filter(g => !g.madeIt && !g.kamikaze).length;
+  const kamSucc = kamGames.length ? `${kamGames.filter(g=>g.kamOutcome==='made').length}/${kamGames.length}` : '0';
+
+  // ── Build HTML ───────────────────────────────────────
+  let html = '';
+
+  // Overview mini-cards
+  html += `<div class="insights-2col">
+    <div class="insights-mini"><div class="insights-mini-lbl">Games Played</div><div class="insights-mini-val">${games.length}</div></div>
+    <div class="insights-mini"><div class="insights-mini-lbl">All-time Money</div><div class="insights-mini-val ${money>=0?'pos':'neg'}">$${money.toFixed(0)}</div></div>
+    <div class="insights-mini"><div class="insights-mini-lbl">Win Rate</div><div class="insights-mini-val ${overallWR>=50?'gold':''}">${overallWR}%</div><div class="insights-mini-sub">${totalWins}W / ${games.length - totalWins}L</div></div>
+    <div class="insights-mini"><div class="insights-mini-lbl">Bid Rate</div><div class="insights-mini-val">${bidRate}%</div><div class="insights-mini-sub">${bidGames.length} bids total</div></div>
+  </div>`;
+
+  // Section 1: Core Bidding
+  html += `<div class="insights-section"><div class="insights-section-title">Core Bidding</div>`;
+  html += insRow('Avg Bid', bidGames.length ? avgBid.toFixed(1) : '—');
+  html += insRow('Bid Success Rate', bidSucc !== null ? `${bidSucc}%` : '—', bidSucc !== null ? (bidSucc >= 60 ? 'pos' : bidSucc < 45 ? 'neg' : '') : '');
+  html += insRow('Set Rate', setRate !== null ? `${setRate}%` : '—', setRate !== null ? (setRate >= 40 ? 'neg' : setRate <= 20 ? 'pos' : '') : '');
+  html += insRow('Avg Margin Above Bid', avgMargin !== null ? `+${avgMargin.toFixed(1)} books` : '—', 'gold');
+  html += insRow('Book Efficiency', bookEff !== null ? `+${bookEff.toFixed(1)} avg` : '—');
+  html += insRow('Favorite Bid', favBid !== null ? `${favBid} (${favBidCount}×)` : '—');
+  if (setByBidStr) html += insRow('Set Rate by Bid Level', setByBidStr);
+  html += insRow('Clutch Score (bids in blitz)', clutchScore !== null ? `${clutchScore}%` : blitzBidGames.length < 3 ? 'Too few blitz bids' : '—', clutchScore !== null ? (clutchScore >= 55 ? 'pos' : clutchScore < 40 ? 'neg' : '') : '');
+  html += insRow('Kamikaze', kamGames.length ? `${kamSucc} · avg $${kamROI >= 0 ? '+' : ''}${kamROI.toFixed(2)}` : '0');
+  html += insRow('Hot Hand (max win streak)', `${maxStreak}`, maxStreak >= 5 ? 'gold' : '');
+  html += `</div>`;
+
+  // Section 2: Partnership
+  html += `<div class="insights-section"><div class="insights-section-title">Partnership Breakdown</div>`;
+  partners.forEach(q => {
+    const st = pStats[q];
+    if (!st || st.g === 0) { html += insRow(`with ${q}`, 'No data'); return; }
+    const wr = Math.round(st.w / st.g * 100);
+    const nc = st.net >= 0 ? 'pos' : 'neg';
+    const detail = `${wr}% · ${st.w}W/${st.g - st.w}L · $${st.net >= 0 ? '+' : ''}${st.net.toFixed(2)}`;
+    html += insRow(`with ${q}`, st.g >= 5 ? detail : `${detail} (${st.g}g)`, st.g >= 5 ? (wr >= 55 ? 'pos' : wr <= 40 ? 'neg' : '') : '');
+  });
+  html += `<div style="margin-top:10px"><div style="font-size:10px;color:var(--cream-dim);font-family:'DM Mono',monospace;margin-bottom:4px;letter-spacing:0.05em">Win % for every pairing</div>
+    <div class="pmatrix-wrap">${buildChemMatrix(allGames)}</div></div>`;
+  html += `</div>`;
+
+  // Section 3: Archetypes
+  html += `<div class="insights-section"><div class="insights-section-title">Player Archetype</div>`;
+  html += insRow('Archetype', archetype, archetype==='Gambler' ? 'amb' : archetype==='Robinhood' ? 'pos' : archetype==='Anchor' ? 'pos' : '');
+  html += insRow('Gambler Score', gamblerScore !== null ? `${gamblerScore} (avg bid × set%)` : bidGames.length < 5 ? 'Need ≥5 bids' : '0.00');
+  html += insRow('Robinhood (blitz bid win%)', robinhoodScore !== null ? `${robinhoodScore}%` : blitzBidGames.length < 3 ? 'Need ≥3 blitz bids' : '—', robinhoodScore !== null ? (robinhoodScore >= 55 ? 'pos' : robinhoodScore < 40 ? 'neg' : '') : '');
+  html += insRow('Anchor (defense win%)', anchorScore !== null ? `${anchorScore}%` : defGames.length < 5 ? 'Need ≥5 games' : '—', anchorScore !== null ? (anchorScore >= 60 ? 'pos' : anchorScore < 40 ? 'neg' : '') : '');
+  html += insRow('Momentum Sensitivity', momentumDiff !== null ? `${momentumDiff > 0 ? '+' : ''}${momentumDiff}% win↑ after a win` : 'Need more data', momentumDiff !== null ? (momentumDiff > 10 ? 'gold' : momentumDiff < -10 ? 'neg' : '') : '');
+  html += `</div>`;
+
+  // Section 4: All-time Records
+  html += `<div class="insights-section"><div class="insights-section-title">All-time Records</div>`;
+  html += insRow('Bostons', `${bostonCount}`, bostonCount >= 2 ? 'pos' : '');
+  html += insRow('Cambridges', `${camCount}`, camCount >= 3 ? 'amb' : '');
+  html += insRow('Total Sets Taken', `${totalSets}`, totalSets >= 5 ? 'neg' : '');
+  html += insRow('9-pt Rounds on Record', S.allSessions.length ? `${S.allSessions.length}` : '0');
+  html += insRow('Max Win Streak', `${maxStreak}`, maxStreak >= 6 ? 'gold' : '');
+  html += insRow('Kamikaze Record', kamGames.length ? `${kamSucc} made` : 'Never attempted');
+  html += `</div>`;
+
+  body.innerHTML = html;
 }
 
 // ── Init ──────────────────────────────────────────
