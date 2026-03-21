@@ -1124,12 +1124,16 @@ body {
   padding: 10px 12px; border-radius: 8px;
   margin-bottom: 6px; border: 1px solid var(--border);
   background: var(--felt-lighter);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background 0.15s;
 }
+.rot-sched-row:active { background: rgba(255,255,255,0.04); }
 .rot-sched-row.current {
   border-color: var(--gold);
   background: rgba(201,168,76,0.08);
+  cursor: default;
 }
-.rot-sched-row.done { opacity: 0.45; }
+.rot-sched-row.done { opacity: 0.55; }
 .rot-sched-num {
   font-family: 'DM Mono', monospace; font-size: 10px;
   color: var(--gold-dim); min-width: 24px;
@@ -1285,7 +1289,7 @@ body { -webkit-text-size-adjust: 100%; }
   color: var(--gold);
 }
 .trend-chart-wrap {
-  margin: 0 16px 4px; border-radius: 8px;
+  margin: 10px 16px 4px; border-radius: 8px;
   background: var(--felt-lighter); border: 1px solid var(--border);
   overflow: hidden;
 }
@@ -1922,7 +1926,6 @@ function showRotSched() {
   if (!S.session) return;
   const rots = getRots(S.players);
   const rotN = S.session.rotationIdx % rots.length;
-  // Show all 3 rotations + lookahead for subsequent cycles
   const totalRots = rots.length;
   let html = '';
   rots.forEach((r, i) => {
@@ -1931,8 +1934,11 @@ function showRotSched() {
     let cls = 'rot-sched-row';
     if (isCurrent) cls += ' current';
     else if (isDone) cls += ' done';
-    const badge = isCurrent ? '<span class="rot-sched-badge">Now</span>' : (isDone ? '<span class="rot-sched-badge">Done</span>' : '');
-    html += `<div class="${cls}">
+    const badge = isCurrent
+      ? '<span class="rot-sched-badge">Now</span>'
+      : (isDone ? '<span class="rot-sched-badge">Done</span>' : '<span class="rot-sched-badge" style="background:rgba(255,255,255,0.07);color:var(--cream-dim)">Switch →</span>');
+    const click = isCurrent ? '' : `onclick="switchToRotation(${i})"`;
+    html += `<div class="${cls}" ${click}>
       <div class="rot-sched-num">${i+1}/${totalRots}</div>
       <div class="rot-sched-partners">
         <div class="rot-sched-team"><span class="rot-sched-team-label rot-sched-team-a">A</span><span>${r[0]} &amp; ${r[1]}</span></div>
@@ -1942,8 +1948,32 @@ function showRotSched() {
     </div>`;
   });
   document.getElementById('rot-sched-body').innerHTML = html;
-  const ov = document.getElementById('rot-sched-overlay');
-  ov.classList.add('open');
+  document.getElementById('rot-sched-overlay').classList.add('open');
+}
+
+function switchToRotation(targetRotIdx) {
+  if (!S.session) return;
+  const rots = getRots(S.players);
+  const currentRotN = S.session.rotationIdx % rots.length;
+  if (targetRotIdx === currentRotN) { closeRotSched(); return; }
+
+  const r = rots[targetRotIdx];
+  const inProgress = S.session.games.length > 0;
+  if (inProgress) {
+    const msg = `Switch to Rotation ${targetRotIdx+1}/${rots.length}?\n\n${r[0]} & ${r[1]}  vs  ${r[2]} & ${r[3]}\n\nYou're in the middle of a session — money standings will reset for the new rotation.`;
+    if (!confirm(msg)) return;
+  }
+
+  // Advance rotationIdx forward to land on the target rotation
+  const len = rots.length;
+  const diff = ((targetRotIdx - currentRotN) % len + len) % len;
+  S.session.rotationIdx += diff;
+  // Snapshot current money as the new rotation baseline
+  S.session.rotationBaseline = {...S.session.money};
+
+  save();
+  closeRotSched();
+  renderPlay();
 }
 
 function closeRotSched() {
@@ -2661,9 +2691,12 @@ function renderStats() {
   const filteredGames = filterByDate(allGames);
 
   // Compute player stats from filtered game records
+  // All players = active roster + anyone in the database not currently on a team
+  const allKnownPlayers = [...S.players, ...getBenchPlayers()];
+
   function computePlayerStats(games) {
     const ps = {};
-    S.players.forEach(p => { ps[p] = {wins:0,losses:0,sets:0,bostons:0,cams:0,bids:0,bidsMade:0,kamA:0,kamM:0}; });
+    allKnownPlayers.forEach(p => { ps[p] = {wins:0,losses:0,sets:0,bostons:0,cams:0,bids:0,bidsMade:0,kamA:0,kamM:0}; });
     games.forEach(g => {
       const bidTeam = g.bidTeam==='A' ? g.teamA : g.teamB;
       const defTeam = g.bidTeam==='A' ? g.teamB : g.teamA;
@@ -2698,20 +2731,20 @@ function renderStats() {
 
   // All-time money always uses cumulative (session-end payouts aren't per-game)
   const combinedMoney = {};
-  S.players.forEach(p => {
+  allKnownPlayers.forEach(p => {
     combinedMoney[p] = (S.allTimeMoney[p]||0) + (S.session?.money[p]||0);
   });
 
-  const hasAnyData = filteredGames.length > 0 || S.players.some(p => combinedMoney[p] !== 0);
+  const hasAnyData = filteredGames.length > 0 || allKnownPlayers.some(p => combinedMoney[p] !== 0);
   if (!hasAnyData) {
     document.getElementById('stats-content').innerHTML = '<div class="empty"><div class="empty-icon">♥</div><div class="empty-title">No stats yet</div></div>';
     return;
   }
 
   const filterLabel = statsFilter === 'month' ? 'this month' : statsFilter === 'year' ? 'this year' : 'all-time';
+  const benchSet = new Set(getBenchPlayers());
 
-  let html = '<div class="stat-grid">';
-  S.players.forEach(p => {
+  function playerCard(p) {
     const st = gameStats[p];
     const m = combinedMoney[p];
     const total = (st.wins||0)+(st.losses||0);
@@ -2719,8 +2752,9 @@ function renderStats() {
     const bp = st.bids ? Math.round(st.bidsMade/st.bids*100)+'%' : '—';
     const kam = st.kamA ? `${st.kamM}/${st.kamA}` : '—';
     const mCls = m>=0?'color:var(--green-bright)':'color:var(--red-bright)';
-    html += `<div class="stat-card" onclick="openInsights('${p}')">
-      <div class="stat-player">${p}</div>
+    const benchTag = benchSet.has(p) ? '<span style="font-size:9px;font-family:\'DM Mono\',monospace;color:var(--cream-dim);text-transform:uppercase;letter-spacing:0.08em;background:var(--felt-lighter);border:1px solid var(--border);border-radius:10px;padding:1px 7px;margin-left:6px">Bench</span>' : '';
+    return `<div class="stat-card" onclick="openInsights('${p.replace(/'/g,"\\'")}')">
+      <div class="stat-player">${p}${benchTag}</div>
       <div class="stat-row"><span class="stat-key">Money (all-time)</span><span class="stat-val" style="${mCls}">$${m.toFixed(2)}</span></div>
       <div class="stat-row"><span class="stat-key">Win rate</span><span class="stat-val">${wr}</span></div>
       <div class="stat-row"><span class="stat-key">W / L</span><span class="stat-val">${st.wins||0} / ${st.losses||0}</span></div>
@@ -2732,8 +2766,23 @@ function renderStats() {
       <div class="stat-row"><span class="stat-key">Kamikaze</span><span class="stat-val">${kam}</span></div>
       <div class="stat-tap-hint">Tap for full insights →</div>
     </div>`;
-  });
+  }
+
+  let html = '<div class="stat-grid">';
+  S.players.forEach(p => { html += playerCard(p); });
   html += '</div>';
+
+  // Bench players section (only if there are any)
+  const bench = getBenchPlayers().filter(p => {
+    const st = gameStats[p];
+    return st && ((st.wins||0)+(st.losses||0)+(st.bids||0)) > 0;
+  });
+  if (bench.length) {
+    html += `<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--cream-dim);font-family:'DM Mono',monospace;margin:16px 0 8px;padding:0 2px">Bench players</div>`;
+    html += '<div class="stat-grid">';
+    bench.forEach(p => { html += playerCard(p); });
+    html += '</div>';
+  }
 
   // Partnership stats from filtered games
   const pairs = {};
