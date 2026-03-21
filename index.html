@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Bid Whist</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -903,6 +903,25 @@ body {
   background: rgba(201,168,76,0.1);
   color: var(--gold);
 }
+
+/* ── iPhone / safe area support ── */
+body { -webkit-text-size-adjust: 100%; }
+@supports (padding: env(safe-area-inset-top)) {
+  .header { padding-top: calc(20px + env(safe-area-inset-top)); }
+  .sticky-log-wrap { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .app { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+}
+
+/* ── Connection indicator ── */
+.conn-dot { font-size: 10px; font-family: 'DM Mono', monospace; letter-spacing: 0.05em; margin-top: 3px; }
+
+/* ── Mobile touch targets ── */
+@media (max-width: 430px) {
+  .bid-btn { padding: 16px 4px; }
+  .hands-btn { padding: 14px 4px; }
+  .team-btn { padding: 16px; }
+  .player-btn { padding: 12px 20px; }
+}
 .rotation-info .rot-num { color: var(--gold); font-weight: 500; }
 </style>
 </head>
@@ -913,6 +932,7 @@ body {
     <div>
       <div class="header-title">♠ Bid Whist</div>
       <div class="header-sub" id="hdr-sub">No active session</div>
+      <div class="conn-dot" id="conn-indicator" style="color:var(--cream-dim)">⬤ connecting…</div>
     </div>
     <button class="btn-ghost" onclick="nav('setup')">Setup</button>
   </div>
@@ -1107,7 +1127,22 @@ body {
   <button class="btn-log-sticky" onclick="logGame()">Log game</button>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script>
+// ── Firebase ──────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyBYicthBSEyZvdM6-FuSuI3XzNrztReDcM",
+  authDomain: "bid-whist-7e295.firebaseapp.com",
+  databaseURL: "https://bid-whist-7e295-default-rtdb.firebaseio.com",
+  projectId: "bid-whist-7e295",
+  storageBucket: "bid-whist-7e295.firebasestorage.app",
+  messagingSenderId: "13653997017",
+  appId: "1:13653997017:web:fdbf39213412b31cb955c8"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
 // ── State ────────────────────────────────────────────
 let S = {
   players: ['Matt','Juan','Rohin','Jackson'],
@@ -1117,7 +1152,15 @@ let S = {
 };
 
 function load() { try { const d=localStorage.getItem('whist4'); if(d) S=JSON.parse(d); } catch(e){} }
-function save() { localStorage.setItem('whist4', JSON.stringify(S)); }
+
+let _saveTimer = null;
+function save() {
+  localStorage.setItem('whist4', JSON.stringify(S));
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    db.ref('whist').set(S).catch(err => console.error('Firebase save error:', err));
+  }, 300);
+}
 
 // form state
 let fBidTeam = null, fBidder = null, fBid = null, fHands = null, fKam = false, fKamOutcome = null;
@@ -1868,9 +1911,38 @@ function resetAll() {
 }
 
 // ── Init ──────────────────────────────────────────
+// Load from localStorage instantly so the app is usable right away
 load();
 renderSetup();
 if (S.session) { nav('play'); } else { nav('setup'); }
+
+// Firebase real-time listener — syncs changes from all users
+db.ref('whist').on('value', snapshot => {
+  const data = snapshot.val();
+  if (!data) return;
+  S = data;
+  localStorage.setItem('whist4', JSON.stringify(S));
+  // Re-render whichever view is currently active
+  const active = document.querySelector('.view.active');
+  if (!active) return;
+  if (active.id === 'view-play') renderPlay();
+  else if (active.id === 'view-history') renderHistory();
+  else if (active.id === 'view-stats') renderStats();
+  // Don't re-render setup to avoid interrupting text input
+});
+
+// Connection status dot
+db.ref('.info/connected').on('value', snap => {
+  const el = document.getElementById('conn-indicator');
+  if (!el) return;
+  if (snap.val()) {
+    el.textContent = '⬤ live';
+    el.style.color = 'var(--teal)';
+  } else {
+    el.textContent = '⬤ offline';
+    el.style.color = 'var(--red-bright)';
+  }
+});
 </script>
 </body>
 </html>
