@@ -43,13 +43,14 @@ body {
   font-family: 'DM Sans', sans-serif;
   font-weight: 400;
   min-height: 100vh;
+  overflow-x: hidden;
   background-image:
     radial-gradient(ellipse at 20% 0%, rgba(201,168,76,0.06) 0%, transparent 60%),
     radial-gradient(ellipse at 80% 100%, rgba(39,174,96,0.04) 0%, transparent 60%);
 }
 
 /* ── Layout ── */
-.app { max-width: 680px; margin: 0 auto; padding: 0 0 100px; }
+.app { max-width: 680px; width: 100%; margin: 0 auto; padding: 0 0 100px; }
 
 /* ── Header ── */
 .header {
@@ -436,9 +437,9 @@ body {
   border: 1px solid var(--border);
   border-radius: 20px;
   color: var(--cream-dim);
-  padding: 10px 20px;
+  padding: 8px 16px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-family: 'DM Sans', sans-serif;
   font-weight: 500;
   transition: all 0.15s;
@@ -975,6 +976,52 @@ body { -webkit-text-size-adjust: 100%; }
   .app { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
 }
 
+/* ── Sticky score bar ── */
+.sticky-score {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 200;
+  background: var(--felt-light);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  transform: translateY(-110%);
+  transition: transform 0.22s ease;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+}
+@supports (padding: env(safe-area-inset-top)) {
+  .sticky-score { padding-top: calc(8px + env(safe-area-inset-top)); }
+}
+.sticky-score.show { transform: translateY(0); }
+.sticky-score-team {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 8px;
+}
+.sticky-score-team.b { justify-content: flex-end; flex-direction: row-reverse; }
+.sticky-score-info { min-width: 0; }
+.sticky-score-team.b .sticky-score-info { text-align: right; }
+.sticky-score-label {
+  font-size: 9px; text-transform: uppercase;
+  font-family: 'DM Mono', monospace; letter-spacing: 0.08em;
+}
+.sticky-score-label.a { color: var(--gold-dim); }
+.sticky-score-label.b { color: var(--teal-dim); }
+.sticky-score-names {
+  font-size: 11px; color: var(--cream-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sticky-score-num {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px; line-height: 1; flex-shrink: 0;
+}
+.sticky-score-num.a { color: var(--gold-pale); }
+.sticky-score-num.b { color: var(--teal-pale); }
+.sticky-score-div {
+  width: 1px; height: 28px;
+  background: var(--border); margin: 0 12px; flex-shrink: 0;
+}
+
 /* ── Connection indicator ── */
 .conn-dot { font-size: 10px; font-family: 'DM Mono', monospace; letter-spacing: 0.05em; margin-top: 3px; }
 
@@ -983,7 +1030,7 @@ body { -webkit-text-size-adjust: 100%; }
   .bid-btn { padding: 16px 4px; }
   .hands-btn { padding: 14px 4px; }
   .team-btn { padding: 16px; }
-  .player-btn { padding: 12px 20px; }
+  .player-btn { padding: 9px 14px; font-size: 13px; }
 }
 .rotation-info .rot-num { color: var(--gold); font-weight: 500; }
 </style>
@@ -1175,6 +1222,9 @@ body { -webkit-text-size-adjust: 100%; }
 
 </div>
 
+<!-- Sticky score bar (play tab) -->
+<div class="sticky-score" id="sticky-score"></div>
+
 <!-- Sticky Log button -->
 <div class="sticky-log-wrap" id="sticky-log-wrap">
   <button class="btn-log-sticky" onclick="logGame()">Log game</button>
@@ -1237,6 +1287,9 @@ function save() {
 // form state
 let fBidTeam = null, fBidder = null, fBid = null, fHands = null, fKam = false, fKamOutcome = null;
 
+// sticky score observer
+let _stickyObs = null;
+
 // ── Rotations ──────────────────────────────────────
 function getRots(ps) {
   const p = ps.slice(0,4);
@@ -1257,6 +1310,11 @@ function nav(tab) {
     document.getElementById('view-'+t).classList.toggle('active', t===tab);
     document.getElementById('nav-'+t).classList.toggle('active', t===tab);
   });
+  if (tab !== 'play') {
+    if (_stickyObs) { _stickyObs.disconnect(); _stickyObs = null; }
+    const ss = document.getElementById('sticky-score');
+    if (ss) ss.classList.remove('show');
+  }
   if (tab==='history') renderHistory();
   if (tab==='stats') renderStats();
   if (tab==='play') renderPlay();
@@ -1727,6 +1785,36 @@ function renderPlay() {
       <div class="score-bar-wrap"><div class="score-bar-fill" style="width:${pctB}%"></div></div>
       <div class="score-pips">${pips(s.scoreB, cfg.pts, 'b')}</div>
     </div>`;
+
+  // Sticky score bar
+  const ss = document.getElementById('sticky-score');
+  if (ss) {
+    ss.innerHTML = `
+      <div class="sticky-score-team a">
+        <div class="sticky-score-info">
+          <div class="sticky-score-label a">Team A</div>
+          <div class="sticky-score-names">${rot[0]} & ${rot[1]}</div>
+        </div>
+        <div class="sticky-score-num a${blitzA?' blitz-num':''}">${s.scoreA}</div>
+      </div>
+      <div class="sticky-score-div"></div>
+      <div class="sticky-score-team b">
+        <div class="sticky-score-num b${blitzB?' blitz-num':''}">${s.scoreB}</div>
+        <div class="sticky-score-info">
+          <div class="sticky-score-label b">Team B</div>
+          <div class="sticky-score-names">${rot[2]} & ${rot[3]}</div>
+        </div>
+      </div>`;
+  }
+  // Show sticky score only when score panels scroll out of view
+  if (_stickyObs) _stickyObs.disconnect();
+  const scorePanelsEl = document.getElementById('score-panels');
+  if (scorePanelsEl && ss) {
+    _stickyObs = new IntersectionObserver(entries => {
+      ss.classList.toggle('show', !entries[0].isIntersecting);
+    }, { threshold: 0 });
+    _stickyObs.observe(scorePanelsEl);
+  }
 
   // Money — team-based layout
   const target = cfg.target;
