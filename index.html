@@ -1644,47 +1644,49 @@ function logGame() {
   };
   s.games.push(game);
 
-  // Check session end
+  // Check 9-point game end
   if (s.scoreA >= cfg.pts || s.scoreB >= cfg.pts) {
-    const winTeam = s.scoreA >= cfg.pts ? `${rot[0]} & ${rot[1]}` : `${rot[2]} & ${rot[3]}`;
-    const losingInBlitz = s.scoreA >= cfg.pts ? s.scoreB < 0 : s.scoreA < 0;
+    const winTeamIsA = s.scoreA >= cfg.pts;
+    const winTeam = winTeamIsA ? `${rot[0]} & ${rot[1]}` : `${rot[2]} & ${rot[3]}`;
+    const losingInBlitz = winTeamIsA ? s.scoreB < 0 : s.scoreA < 0;
     const sessionBlitzMult = losingInBlitz ? cfg.blitz : 1;
     const winPay = cfg.win * sessionBlitzMult;
-    const winTeamPlayers = s.scoreA >= cfg.pts ? [rot[0],rot[1]] : [rot[2],rot[3]];
-    const loseTeamPlayers = s.scoreA >= cfg.pts ? [rot[2],rot[3]] : [rot[0],rot[1]];
+    const winTeamPlayers = winTeamIsA ? [rot[0],rot[1]] : [rot[2],rot[3]];
+    const loseTeamPlayers = winTeamIsA ? [rot[2],rot[3]] : [rot[0],rot[1]];
     winTeamPlayers.forEach(p => s.money[p] = (s.money[p]||0) + winPay);
     loseTeamPlayers.forEach(p => s.money[p] = (s.money[p]||0) - winPay);
 
     S.allSessions.push({ games:[...s.games], money:{...s.money}, winTeam, endedAt:Date.now() });
 
+    // Rotate teams only when winning team both hit $20 target
+    const teamHit20 = winTeamPlayers.every(p => (s.money[p]||0) >= cfg.target);
     document.getElementById('session-banner').classList.add('show');
-    document.getElementById('session-banner-title').textContent = `${winTeam} win the session!`;
-    document.getElementById('session-banner-sub').textContent =
-      `$${winPay.toFixed(2)} session payout${losingInBlitz?' (blitz multiplier applied)':''}. Starting next rotation.`;
+    if (teamHit20) {
+      document.getElementById('session-banner-title').textContent = `${winTeam} reach $${cfg.target}!`;
+      document.getElementById('session-banner-sub').textContent =
+        `$${winPay.toFixed(2)} payout${losingInBlitz?' (blitz)':''}. Starting new rotation — teams change!`;
+      s.rotationIdx++;
+    } else {
+      document.getElementById('session-banner-title').textContent = `${winTeam} win!`;
+      document.getElementById('session-banner-sub').textContent =
+        `$${winPay.toFixed(2)} payout${losingInBlitz?' (blitz)':''}. Same teams — play to ${cfg.pts} again.`;
+    }
 
-    s.rotationIdx++;
     s.scoreA = 0; s.scoreB = 0;
 
-    // Flash rotation indicator
-    const ri = document.getElementById('rotation-info');
-    if (ri) {
-      ri.classList.add('flash');
-      setTimeout(() => ri.classList.remove('flash'), 1200);
-    }
     // Flash score panels
     document.querySelectorAll('.score-panel').forEach(p => {
       p.classList.add('rot-flash');
       setTimeout(() => p.classList.remove('rot-flash'), 700);
     });
+    // Flash rotation indicator only when teams actually change
+    if (teamHit20) {
+      const ri = document.getElementById('rotation-info');
+      if (ri) { ri.classList.add('flash'); setTimeout(() => ri.classList.remove('flash'), 1200); }
+    }
   }
 
   resetForm();
-
-  S.players.forEach(p => {
-    if ((s.money[p]||0) >= cfg.target) {
-      setTimeout(()=>alert(`🏆 ${p} has reached $${cfg.target}! Check the standings.`), 300);
-    }
-  });
 
   save();
   renderPlay();
