@@ -2370,8 +2370,8 @@ function updatePreview() {
         lines.push(`<span class="made">${bidTeamNames} made it${bidBlitz?' (blitz)':''} — no money this hand</span>`);
       }
     } else {
-      const pen = (cfg.set * blitzMult).toFixed(2);
-      lines.push(`<span class="set">${bidTeamNames} set — pay $${pen}${bidBlitz?' (blitz)':''}</span>`);
+      const pen = cfg.set.toFixed(2);
+      lines.push(`<span class="set">${bidTeamNames} set — pay $${pen}</span>`);
     }
     if (res.otherPts > 0) lines.push(`${otherTeamNames} win ${res.otherHands} hands (+${res.otherPts} pts)`);
   } else {
@@ -2429,7 +2429,7 @@ function logGame() {
         otherTeam.forEach(p => delta[p] -= bonus);
       }
     } else {
-      const pen = cfg.set * blitzMult; // blitz multiplier applies when bidding team is in blitz
+      const pen = cfg.set; // flat — blitz premium on sets is applied at game-end if losingInBlitz
       bidTeam.forEach(p => delta[p] -= pen);
       otherTeam.forEach(p => delta[p] += pen);
     }
@@ -2479,6 +2479,14 @@ function logGame() {
     const loseTeamPlayers = winTeamIsA ? [rot[2],rot[3]] : [rot[0],rot[1]];
     winTeamPlayers.forEach(p => { s.money[p] = (s.money[p]||0) + winPay; game.delta[p] = (game.delta[p]||0) + winPay; });
     loseTeamPlayers.forEach(p => { s.money[p] = (s.money[p]||0) - winPay; game.delta[p] = (game.delta[p]||0) - winPay; });
+    // If the game-ending hand was a set AND the round ends in blitz, top-up the set
+    // by the blitz premium so the total = (win + set) * blitzMult.
+    // The set was already paid flat (cfg.set); we add the extra (blitzMult-1)*cfg.set here.
+    if (!fKam && !res.madeIt && losingInBlitz) {
+      const setBlitzExtra = cfg.set * (sessionBlitzMult - 1);
+      winTeamPlayers.forEach(p => { s.money[p] += setBlitzExtra; game.delta[p] += setBlitzExtra; });
+      loseTeamPlayers.forEach(p => { s.money[p] -= setBlitzExtra; game.delta[p] -= setBlitzExtra; });
+    }
 
     S.allSessions.push({ games:[...s.games], money:{...s.money}, winTeam, endedAt:Date.now() });
 
