@@ -4963,7 +4963,7 @@ function renderLedger() {
   // Mission Ceviche button row (below Who Owes Who)
   html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px">
     <button class="btn-ghost" onclick="missionCeviche()" style="flex:1;font-size:13px;padding:8px 12px;border:1px solid var(--border)">
-      🐟 Mission Ceviche?${hasSettled ? ' (settled)' : ''}
+      🐟 Go to Mission Ceviche?${hasSettled ? ' (settled)' : ''}
     </button>
     ${canUndo ? `<button class="btn-ghost" onclick="undoMissionCeviche()" style="font-size:12px;padding:8px 10px;border:1px solid var(--border);color:var(--cream-dim)">↩ Undo</button>` : ''}
   </div>`;
