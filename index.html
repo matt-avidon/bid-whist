@@ -2371,8 +2371,8 @@ function updatePreview() {
         lines.push(`<span class="made">${bidTeamNames} made it${bidBlitz?' (blitz)':''} — no money this hand</span>`);
       }
     } else {
-      const pen = cfg.set.toFixed(2);
-      lines.push(`<span class="set">${bidTeamNames} set — pay $${pen}</span>`);
+      const pen = (cfg.set * blitzMult).toFixed(2);
+      lines.push(`<span class="set">${bidTeamNames} set — pay $${pen}${bidBlitz?' (blitz)':''}</span>`);
     }
     if (res.otherPts > 0) lines.push(`${otherTeamNames} win ${res.otherHands} hands (+${res.otherPts} pts)`);
   } else {
@@ -2430,7 +2430,7 @@ function logGame() {
         otherTeam.forEach(p => delta[p] -= bonus);
       }
     } else {
-      const pen = cfg.set; // set penalty is flat — no blitz multiplier
+      const pen = cfg.set * blitzMult; // blitz multiplier applies when bidding team is in blitz
       bidTeam.forEach(p => delta[p] -= pen);
       otherTeam.forEach(p => delta[p] += pen);
     }
