@@ -2185,9 +2185,7 @@ function setBidder(p) {
 
 function setBid(b) {
   fBid = b;
-  // Default hands to minimum only if user hasn't already made a selection —
-  // otherwise preserve their choice so a Boston/13 pick survives a bid change.
-  if (fHands === null) fHands = Math.min(13, b + 6);
+  fHands = Math.min(13, b + 6);
   document.querySelectorAll('.bid-btn').forEach(el => {
     el.classList.remove('sel-a','sel-b');
     if (parseInt(el.dataset.bid) === b) el.classList.add(teamSelClass(fBidTeam || 'A'));
@@ -2263,7 +2261,7 @@ function renderHandsGrid() {
 }
 
 function setHandsDefault() {
-  fHands = 7;
+  fHands = null;
 }
 
 function toggleKam() {
