@@ -2708,8 +2708,9 @@ function renderPlay() {
       </div>
     </div>`;
   }
-  document.getElementById('money-rows').innerHTML = `
-    <div class="money-teams">
+  document.getElementById('money-rows').innerHTML = s.games.length === 0
+    ? `<div style="text-align:center;padding:12px 0;color:var(--cream-dim);font-size:13px">No games logged yet</div>`
+    : `<div class="money-teams">
       <div class="money-team-col">
         <div class="money-team-label team-a-label">Team A</div>
         ${teamAPlayers.map(moneyPlayerHTML).join('')}
