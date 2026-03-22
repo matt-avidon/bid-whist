@@ -2483,8 +2483,14 @@ function logGame() {
 
     S.allSessions.push({ games:[...s.games], money:{...s.money}, winTeam, endedAt:Date.now() });
 
-    // Compute net round total for popup (sets + game win)
-    const roundGames = s.games.filter(g => g.rotIdx === s.rotationIdx);
+    // Compute net round total for popup (sets + game win).
+    // Use snapshot-diff to isolate this round's games — rotationIdx is only incremented
+    // when teams change (hit target), not on every round, so it cannot be used here.
+    // allSessions was just pushed, so [length-2] is the previous round's snapshot.
+    const _prevSnapTs = S.allSessions.length >= 2
+      ? new Set((S.allSessions[S.allSessions.length - 2].games||[]).map(g => g.ts))
+      : new Set();
+    const roundGames = s.games.filter(g => !_prevSnapTs.has(g.ts));
     const winnerRef = winTeamPlayers[0];
     const roundTotal = roundGames.reduce((sum, g) => sum + (g.delta?.[winnerRef]||0), 0);
     const setMoney = roundTotal - winPay; // net from sets only (win pay already added above)
@@ -2728,8 +2734,11 @@ function renderPlay() {
   renderHandsGrid();
   updatePreview();
 
-  // Games this session (current rotation only)
-  const rotGames = s.games.filter(g => g.rotIdx === s.rotationIdx);
+  // Games this round only — use snapshot-diff so rounds without a rotation change
+  // (rotationIdx unchanged) are still isolated correctly.
+  const _lastSnap = S.allSessions.length ? S.allSessions[S.allSessions.length - 1] : null;
+  const _prevRoundTs = _lastSnap ? new Set((_lastSnap.games||[]).map(g => g.ts)) : new Set();
+  const rotGames = s.games.filter(g => !_prevRoundTs.has(g.ts));
   document.getElementById('game-count').textContent = rotGames.length;
   document.getElementById('btn-undo').style.display = s.games.length ? '' : 'none';
 
@@ -4725,29 +4734,28 @@ function renderLedger() {
   const el = document.getElementById('ledger-content');
   if (!el) return;
 
-  // Build rounds: each allSessions entry is one 9-pt round
-  // Games for a round = the last rotIdx chunk of sess.games
-  function getRoundGames(sess) {
-    const games = sess.games || [];
-    if (!games.length) return [];
-    const lastRotIdx = games[games.length - 1].rotIdx;
-    return games.filter(g => g.rotIdx === lastRotIdx);
+  // Build rounds: each allSessions entry is one 9-pt round.
+  // Use snapshot-diff to isolate each round's games — rotationIdx is only incremented
+  // when teams change (hit money target), not every round, so it can't be used here.
+  function diffGames(games, prevGames) {
+    const prevTs = new Set((prevGames||[]).map(g => g.ts));
+    return (games||[]).filter(g => !prevTs.has(g.ts));
   }
 
   // Collect all completed rounds + current in-progress round
   const rounds = []; // { games, winTeam, endedAt, roundNum, isCurrent, players }
   let roundNum = 0;
-  (S.allSessions||[]).forEach(sess => {
+  (S.allSessions||[]).forEach((sess, i) => {
     roundNum++;
-    const rg = getRoundGames(sess);
+    const prevGames = i > 0 ? (S.allSessions[i-1].games||[]) : [];
+    const rg = diffGames(sess.games, prevGames);
     const rPlayers = [...new Set(rg.flatMap(g => [...(g.teamA||[]), ...(g.teamB||[])]))];
     rounds.push({ games: rg, winTeam: sess.winTeam, endedAt: sess.endedAt, roundNum, isCurrent: false, players: rPlayers });
   });
   // Current session in-progress
   if (S.session && S.session.games.length) {
-    const curGames = S.session.games;
-    const lastRotIdx = curGames[curGames.length - 1].rotIdx;
-    const rg = curGames.filter(g => g.rotIdx === lastRotIdx);
+    const lastSnap = S.allSessions.length ? S.allSessions[S.allSessions.length - 1] : null;
+    const rg = diffGames(S.session.games, lastSnap ? lastSnap.games : []);
     const rPlayers = [...new Set(rg.flatMap(g => [...(g.teamA||[]), ...(g.teamB||[])]))];
     roundNum++;
     rounds.push({ games: rg, winTeam: null, endedAt: null, roundNum, isCurrent: true, players: rPlayers });
