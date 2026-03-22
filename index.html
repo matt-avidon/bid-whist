@@ -5006,7 +5006,18 @@ function applyRemoteData(data) {
   if (!data.allTimeMoney || typeof data.allTimeMoney !== 'object') data.allTimeMoney = {};
   if (!data.settleOffset || typeof data.settleOffset !== 'object') data.settleOffset = {};
   if (data.prevSettleOffset !== undefined && typeof data.prevSettleOffset !== 'object') data.prevSettleOffset = null;
+  // Preserve local settle state — Firebase may echo back stale data during the
+  // 300 ms debounce window after a settle-up, which would wipe prevSettleOffset.
+  // Local settle state is always saved to localStorage immediately, so it is the
+  // source of truth until Firebase catches up.
+  const localSettle    = S.settleOffset    || {};
+  const localPrevSettle = S.prevSettleOffset;
   S = data;
+  // Keep whichever settle state has more entries (i.e. the more recent one).
+  if (Object.keys(localSettle).length >= Object.keys(S.settleOffset).length) {
+    S.settleOffset = localSettle;
+    S.prevSettleOffset = localPrevSettle !== undefined ? localPrevSettle : null;
+  }
   localStorage.setItem('whist4', JSON.stringify(S));
   const active = document.querySelector('.view.active');
   if (!active) return;
