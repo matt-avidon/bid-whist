@@ -4928,14 +4928,6 @@ function renderLedger() {
   const canUndo = S.prevSettleOffset !== null && S.prevSettleOffset !== undefined;
   let html = `<div style="padding-bottom:20px">`;
 
-  // Mission Ceviche button row
-  html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px">
-    <button class="btn-ghost" onclick="missionCeviche()" style="flex:1;font-size:13px;padding:8px 12px;border:1px solid var(--border)">
-      🍋 Mission Ceviche${hasSettled ? ' (settled)' : ''}
-    </button>
-    ${canUndo ? `<button class="btn-ghost" onclick="undoMissionCeviche()" style="font-size:12px;padding:8px 10px;border:1px solid var(--border);color:var(--cream-dim)">↩ Undo</button>` : ''}
-  </div>`;
-
   // Section 1: Who Owes Who
   html += `<div class="insights-section" style="margin:0 0 16px">
     <div class="insights-section-title">💸 Who Owes Who</div>`;
@@ -4967,6 +4959,14 @@ function renderLedger() {
   }
   html += `<div style="font-size:10px;color:var(--cream-dim);margin-top:8px;font-family:'DM Mono',monospace">Tap a row to see the rounds. Tap a round to see individual hands.</div>`;
   html += `</div>`;
+
+  // Mission Ceviche button row (below Who Owes Who)
+  html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px">
+    <button class="btn-ghost" onclick="missionCeviche()" style="flex:1;font-size:13px;padding:8px 12px;border:1px solid var(--border)">
+      🐟 Mission Ceviche${hasSettled ? ' (settled)' : ''}
+    </button>
+    ${canUndo ? `<button class="btn-ghost" onclick="undoMissionCeviche()" style="font-size:12px;padding:8px 10px;border:1px solid var(--border);color:var(--cream-dim)">↩ Undo</button>` : ''}
+  </div>`;
 
   // Section 2: All Rounds log
   html += `<div class="insights-section" style="margin:0">
