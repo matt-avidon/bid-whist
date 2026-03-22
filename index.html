@@ -2093,6 +2093,12 @@ function nav(tab) {
     // Reset scroll so score panels are visible and sticky-score doesn't flash
     const pv = document.getElementById('view-play');
     if (pv) pv.scrollTop = 0;
+    // Proactively hide sticky bar — the observer may fire mid-animation (while
+    // the panel is off-screen) and incorrectly show it. We hide it here and the
+    // scrollTop guard in the observer callback prevents it from re-appearing
+    // until the user actually scrolls down.
+    const ss = document.getElementById('sticky-score');
+    if (ss) ss.classList.remove('show');
     renderPlay();
   }
   if (tab==='setup') renderSetup();
@@ -2661,7 +2667,11 @@ function renderPlay() {
   const scorePanelsEl = document.getElementById('score-panels');
   if (scorePanelsEl && ss) {
     _stickyObs = new IntersectionObserver(entries => {
-      ss.classList.toggle('show', !entries[0].isIntersecting);
+      // Only show when the score panels are truly scrolled out of view,
+      // not just off-screen because the tab-slide animation is in progress.
+      const pv = document.getElementById('view-play');
+      const scrolledDown = pv ? pv.scrollTop > 20 : false;
+      ss.classList.toggle('show', !entries[0].isIntersecting && scrolledDown);
     }, { threshold: 0 });
     _stickyObs.observe(scorePanelsEl);
   }
