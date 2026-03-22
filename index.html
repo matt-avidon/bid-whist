@@ -2515,13 +2515,15 @@ function logGame() {
     const roundGames = s.games.filter(g => !_prevSnapTs.has(g.ts));
     const winnerRef = winTeamPlayers[0];
     const roundTotal = roundGames.reduce((sum, g) => sum + (g.delta?.[winnerRef]||0), 0);
-    const setMoney = roundTotal - winPay; // net from sets only (win pay already added above)
+    const extraMoney = roundTotal - winPay; // hand-level money (sets, bostons, cambridges)
     function fmtPopupPay() {
       const winStr = `$${winPay.toFixed(2)} win${losingInBlitz?' (blitz)':''}`;
-      if (Math.abs(setMoney) < 0.01) return `+${winStr}`;
-      const setStr = `${setMoney >= 0 ? '+' : '−'}$${Math.abs(setMoney).toFixed(2)} sets`;
-      const netStr = `$${roundTotal.toFixed(2)} net`;
-      return `+${netStr} (${winStr} ${setMoney >= 0 ? '+' : '−'} $${Math.abs(setMoney).toFixed(2)} sets)`;
+      if (Math.abs(extraMoney) < 0.01) return `+${winStr}`;
+      // Label based on what actually happened in the round
+      const hadSet    = roundGames.some(g => !(g.kamikaze ? g.kamOutcome==='made' : g.madeIt));
+      const hadBonus  = roundGames.some(g => g.boston || g.cambridge);
+      const extraLabel = hadSet && hadBonus ? 'bonuses & sets' : hadBonus ? 'bonuses' : 'sets';
+      return `+$${roundTotal.toFixed(2)} net ($${winPay.toFixed(2)} win ${extraMoney >= 0 ? '+' : '−'} $${Math.abs(extraMoney).toFixed(2)} ${extraLabel})`;
     }
     const popupPay = fmtPopupPay();
 
