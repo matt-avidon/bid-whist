@@ -1927,7 +1927,9 @@ let S = {
   session: null,
   allSessions: [],
   allTimeStats: {},
-  allTimeMoney: {}
+  allTimeMoney: {},
+  settleOffset: {},      // snapshot of combinedMoney at last "Mission Ceviche" settlement
+  prevSettleOffset: null // previous settleOffset, kept for one-level undo
 };
 
 function load() {
@@ -1940,6 +1942,8 @@ function load() {
       if (!Array.isArray(S.allSessions)) S.allSessions = [];
       if (!S.allTimeStats || typeof S.allTimeStats !== 'object') S.allTimeStats = {};
       if (!S.allTimeMoney || typeof S.allTimeMoney !== 'object') S.allTimeMoney = {};
+      if (!S.settleOffset || typeof S.settleOffset !== 'object') S.settleOffset = {};
+      if (S.prevSettleOffset !== undefined && typeof S.prevSettleOffset !== 'object') S.prevSettleOffset = null;
     }
   } catch(e) {}
 }
@@ -3294,7 +3298,28 @@ function exportCSV() {
 function resetAll() {
   if (!confirm('Clear all data?')) return;
   S.session=null; S.allSessions=[]; S.allTimeStats={}; S.allTimeMoney={};
+  S.settleOffset={}; S.prevSettleOffset=null;
   save(); nav('setup');
+}
+
+// ── Mission Ceviche — settle up ───────────────────
+function missionCeviche() {
+  if (!confirm('Mission Ceviche 🍋\n\nAre you sure you want to settle up? Ledger balances will revert to $0.\n\nThis only affects the Ledger — stats and insights are untouched.')) return;
+  const allKnown = [...new Set([
+    ...Object.keys(S.allTimeMoney||{}),
+    ...Object.keys(S.session?.money||{})
+  ])];
+  S.prevSettleOffset = { ...(S.settleOffset||{}) };
+  allKnown.forEach(p => {
+    S.settleOffset[p] = (S.allTimeMoney[p]||0) + (S.session?.money[p]||0);
+  });
+  save(); renderLedger();
+}
+function undoMissionCeviche() {
+  if (!confirm('Undo Mission Ceviche?\n\nLedger balances will be restored to before the last settle-up.')) return;
+  S.settleOffset = S.prevSettleOffset ? { ...S.prevSettleOffset } : {};
+  S.prevSettleOffset = null;
+  save(); renderLedger();
 }
 
 // ── History collapsible sessions ───────────────────
@@ -4756,15 +4781,12 @@ function renderLedger() {
   if (!el) return;
 
   // Build rounds: each allSessions entry is one 9-pt round.
-  // Use snapshot-diff to isolate each round's games — rotationIdx is only incremented
-  // when teams change (hit money target), not every round, so it can't be used here.
   function diffGames(games, prevGames) {
     const prevTs = new Set((prevGames||[]).map(g => g.ts));
     return (games||[]).filter(g => !prevTs.has(g.ts));
   }
 
-  // Collect all completed rounds + current in-progress round
-  const rounds = []; // { games, winTeam, endedAt, roundNum, isCurrent, players }
+  const rounds = [];
   let roundNum = 0;
   (S.allSessions||[]).forEach((sess, i) => {
     roundNum++;
@@ -4773,7 +4795,6 @@ function renderLedger() {
     const rPlayers = [...new Set(rg.flatMap(g => [...(g.teamA||[]), ...(g.teamB||[])]))];
     rounds.push({ games: rg, winTeam: sess.winTeam, endedAt: sess.endedAt, roundNum, isCurrent: false, players: rPlayers });
   });
-  // Current session in-progress
   if (S.session && S.session.games.length) {
     const lastSnap = S.allSessions.length ? S.allSessions[S.allSessions.length - 1] : null;
     const rg = diffGames(S.session.games, lastSnap ? lastSnap.games : []);
@@ -4790,39 +4811,39 @@ function renderLedger() {
     return;
   }
 
-  // ── Pairwise net balances (from round-level money flows) ──
+  // ── Net balances since last settlement ──
+  // combinedMoney = allTimeMoney + current session money (same as everywhere else in the app)
+  // balance = combinedMoney − settleOffset  →  reflects only money earned since last settle-up
+  const settleOffset = S.settleOffset || {};
+  const balance = {};
+  players.forEach(p => {
+    const combined = (S.allTimeMoney[p]||0) + (S.session?.money[p]||0);
+    balance[p] = combined - (settleOffset[p]||0);
+  });
+
+  // ── Minimum-transactions settlement (greedy) ──
+  // Creditors (positive balance) are owed money; debtors (negative) owe money.
+  // This is correct because money in Bid Whist only flows team-vs-team;
+  // partners never directly owe each other.
+  function settleDebts(bal) {
+    const txns = [];
+    const cred = Object.entries(bal).filter(([,v]) => v > 0.005).map(([p,v]) => [p, v]).sort((a,b) => b[1]-a[1]);
+    const debt = Object.entries(bal).filter(([,v]) => v < -0.005).map(([p,v]) => [p, v]).sort((a,b) => a[1]-b[1]);
+    let ci = 0, di = 0;
+    while (ci < cred.length && di < debt.length) {
+      const amt = Math.min(cred[ci][1], -debt[di][1]);
+      if (amt > 0.005) txns.push({ from: debt[di][0], to: cred[ci][0], amount: amt });
+      cred[ci][1] -= amt;
+      debt[di][1] += amt;
+      if (cred[ci][1] < 0.005) ci++;
+      if (debt[di][1] > -0.005) di++;
+    }
+    return txns;
+  }
+  const netOwes = settleDebts(balance).sort((a,b) => b.amount - a.amount);
+
+  // For the expanded pair view, find rounds where BOTH players were at the table
   function pairKey(a, b) { return [a,b].sort().join('|||'); }
-  const pairNet = {}; // key → { p1: net$ } (positive = p2 owes p1)
-
-  rounds.filter(r => !r.isCurrent).forEach(r => {
-    // Sum each player's delta for the round
-    const roundDelta = {};
-    r.players.forEach(p => {
-      roundDelta[p] = r.games.reduce((s,g) => s + (g.delta?.[p]||0), 0);
-    });
-    // Each losing player owes each winning player their share
-    const winners = r.players.filter(p => (roundDelta[p]||0) > 0);
-    const losers  = r.players.filter(p => (roundDelta[p]||0) < 0);
-    winners.forEach(w => {
-      losers.forEach(l => {
-        const flow = Math.min(roundDelta[w], Math.abs(roundDelta[l]));
-        const k = pairKey(w, l);
-        if (!pairNet[k]) pairNet[k] = {};
-        pairNet[k][w] = (pairNet[k][w]||0) + flow;
-        pairNet[k][l] = (pairNet[k][l]||0) - flow;
-      });
-    });
-  });
-
-  const netOwes = [];
-  Object.entries(pairNet).forEach(([k, net]) => {
-    const [p1, p2] = k.split('|||');
-    const n = net[p1] || 0;
-    if (Math.abs(n) < 0.01) return;
-    if (n > 0) netOwes.push({ key:k, from: p2, to: p1, amount: n });
-    else netOwes.push({ key:k, from: p1, to: p2, amount: -n });
-  });
-  netOwes.sort((a,b) => b.amount - a.amount);
 
   // Helper: render individual hand rows inside a round
   function renderHandRows(rGames) {
@@ -4879,10 +4900,11 @@ function renderLedger() {
     const winBadge = r.winTeam ? `<span style="font-size:11px;color:var(--gold-pale);font-weight:600">♠ ${r.winTeam}</span>` : `<span style="font-size:11px;color:var(--teal-dim)">In progress</span>`;
     const chevron = expanded ? '▼' : '▶';
 
-    // If filtering by pair, skip rounds where neither player is in roundDelta
+    // If filtering by pair, only show rounds where BOTH players were at the table
     if (filterPair) {
       const [fa, fb] = filterPair.split('|||');
-      if (!roundDelta[fa] && !roundDelta[fb]) return '';
+      const atTable = p => r.players.includes(p);
+      if (!atTable(fa) || !atTable(fb)) return '';
     }
 
     return `<div style="border-bottom:1px solid var(--border);padding:10px 0">
@@ -4902,18 +4924,32 @@ function renderLedger() {
   }
 
   // ── Build HTML ──
+  const hasSettled = Object.keys(settleOffset).length > 0;
+  const canUndo = S.prevSettleOffset !== null && S.prevSettleOffset !== undefined;
   let html = `<div style="padding-bottom:20px">`;
+
+  // Mission Ceviche button row
+  html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px">
+    <button class="btn-ghost" onclick="missionCeviche()" style="flex:1;font-size:13px;padding:8px 12px;border:1px solid var(--border)">
+      🍋 Mission Ceviche${hasSettled ? ' (settled)' : ''}
+    </button>
+    ${canUndo ? `<button class="btn-ghost" onclick="undoMissionCeviche()" style="font-size:12px;padding:8px 10px;border:1px solid var(--border);color:var(--cream-dim)">↩ Undo</button>` : ''}
+  </div>`;
 
   // Section 1: Who Owes Who
   html += `<div class="insights-section" style="margin:0 0 16px">
     <div class="insights-section-title">💸 Who Owes Who</div>`;
+  if (hasSettled) {
+    html += `<div style="font-size:10px;color:var(--teal-dim);font-family:'DM Mono',monospace;margin-bottom:8px">Showing balances since last settle-up</div>`;
+  }
   if (!netOwes.length) {
     html += `<div style="color:var(--cream-dim);font-size:13px;padding:8px 0">All square — no outstanding balances.</div>`;
   } else {
-    netOwes.forEach(({ key, from, to, amount }) => {
-      const isExp = _ledgerExpandedPair === key;
+    netOwes.forEach(({ from, to, amount }) => {
+      const k = pairKey(from, to);
+      const isExp = _ledgerExpandedPair === k;
       html += `<div style="border-bottom:1px solid var(--border)">
-        <div class="insights-row tappable" onclick="toggleLedgerPair('${key}')" style="padding:12px 0;cursor:pointer">
+        <div class="insights-row tappable" onclick="toggleLedgerPair('${k}')" style="padding:12px 0;cursor:pointer">
           <span class="insights-key" style="font-size:14px">
             <strong style="color:var(--red-bright)">${from}</strong> owes <strong style="color:var(--teal-pale)">${to}</strong>
           </span>
@@ -4923,8 +4959,8 @@ function renderLedger() {
           </span>
         </div>
         ${isExp ? `<div style="padding:0 0 12px">
-          <div style="font-size:10px;color:var(--cream-dim);font-family:'DM Mono',monospace;margin-bottom:6px">Rounds where money was exchanged — tap a round to see hands</div>
-          ${rounds.map(r => renderRoundCard(r, key)).join('')}
+          <div style="font-size:10px;color:var(--cream-dim);font-family:'DM Mono',monospace;margin-bottom:6px">Rounds where both players were at the table — tap to see hands</div>
+          ${rounds.map(r => renderRoundCard(r, k)).join('')}
         </div>` : ''}
       </div>`;
     });
@@ -4968,6 +5004,8 @@ function applyRemoteData(data) {
   if (!Array.isArray(data.allSessions)) data.allSessions = [];
   if (!data.allTimeStats || typeof data.allTimeStats !== 'object') data.allTimeStats = {};
   if (!data.allTimeMoney || typeof data.allTimeMoney !== 'object') data.allTimeMoney = {};
+  if (!data.settleOffset || typeof data.settleOffset !== 'object') data.settleOffset = {};
+  if (data.prevSettleOffset !== undefined && typeof data.prevSettleOffset !== 'object') data.prevSettleOffset = null;
   S = data;
   localStorage.setItem('whist4', JSON.stringify(S));
   const active = document.querySelector('.view.active');
