@@ -3304,7 +3304,7 @@ function resetAll() {
 
 // ── Mission Ceviche — settle up ───────────────────
 function missionCeviche() {
-  if (!confirm('Mission Ceviche 🍋\n\nAre you sure you want to settle up? Ledger balances will revert to $0.\n\nThis only affects the Ledger — stats and insights are untouched.')) return;
+  if (!confirm('Mission Ceviche? 🐟\n\nAre you sure you want to settle up? Ledger balances will revert to $0.\n\nThis only affects the Ledger — stats and insights are untouched.')) return;
   const allKnown = [...new Set([
     ...Object.keys(S.allTimeMoney||{}),
     ...Object.keys(S.session?.money||{})
@@ -4963,7 +4963,7 @@ function renderLedger() {
   // Mission Ceviche button row (below Who Owes Who)
   html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px">
     <button class="btn-ghost" onclick="missionCeviche()" style="flex:1;font-size:13px;padding:8px 12px;border:1px solid var(--border)">
-      🐟 Mission Ceviche${hasSettled ? ' (settled)' : ''}
+      🐟 Mission Ceviche?${hasSettled ? ' (settled)' : ''}
     </button>
     ${canUndo ? `<button class="btn-ghost" onclick="undoMissionCeviche()" style="font-size:12px;padding:8px 10px;border:1px solid var(--border);color:var(--cream-dim)">↩ Undo</button>` : ''}
   </div>`;
