@@ -2185,8 +2185,9 @@ function setBidder(p) {
 
 function setBid(b) {
   fBid = b;
-  // Default hands to exact minimum needed to make this bid (most likely outcome)
-  fHands = Math.min(13, b + 6);
+  // Default hands to minimum only if user hasn't already made a selection —
+  // otherwise preserve their choice so a Boston/13 pick survives a bid change.
+  if (fHands === null) fHands = Math.min(13, b + 6);
   document.querySelectorAll('.bid-btn').forEach(el => {
     el.classList.remove('sel-a','sel-b');
     if (parseInt(el.dataset.bid) === b) el.classList.add(teamSelClass(fBidTeam || 'A'));
@@ -2219,7 +2220,7 @@ function renderHandsGrid() {
     } else if (fBid !== null) {
       cls = isLoss ? 'bid-loss' : 'bid-win';
     }
-    return `<button class="hands-btn ${cls}" onclick="setHands(${i})" ontouchstart="">${i}</button>`;
+    return `<button class="hands-btn ${cls}" onclick="setHands(${i})">${i}</button>`;
   }
 
   const setContainer = document.getElementById('hands-set-btns');
@@ -2694,8 +2695,10 @@ function renderPlay() {
     const bp = ps.bids ? `${Math.round(ps.bidsMade/ps.bids*100)}%` : '—';
     const rotCls = rotM>0?'pos':rotM<0?'neg':'zero';
     const totalCls = totalM>0?'color:var(--teal-pale)':totalM<0?'color:var(--red-bright)':'color:var(--cream-dim)';
-    const pct = Math.max(0, Math.min(100, Math.abs(rotM) / Math.max(1, target) * 100));
-    const barCls = rotM >= 0 ? 'pos' : 'neg';
+    // Hide the bar for negative rotation money — a full red bar is misleading
+    // (implies "nearly there") when the player is actually down.
+    const pct = rotM <= 0 ? 0 : Math.min(100, rotM / Math.max(1, target) * 100);
+    const barCls = 'pos';
     return `<div class="money-player-card" onclick="openInsights('${p.replace(/'/g,"\\'")}') " style="cursor:pointer;-webkit-tap-highlight-color:transparent">
       <div class="money-name">${p} <span style="font-size:9px;color:var(--cream-dim);font-family:'DM Mono',monospace">→</span></div>
       <div class="money-amt ${rotCls}">$${rotM.toFixed(2)}</div>
