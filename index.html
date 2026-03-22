@@ -2477,16 +2477,27 @@ function logGame() {
     const winPay = cfg.win * sessionBlitzMult;
     const winTeamPlayers = winTeamIsA ? [rot[0],rot[1]] : [rot[2],rot[3]];
     const loseTeamPlayers = winTeamIsA ? [rot[2],rot[3]] : [rot[0],rot[1]];
+
+    // If the round ends in blitz, the multiplier applies to ALL money earned during
+    // the round (every set, bonus, etc.) — not just the win pay.
+    // Each player's flat round delta is already in s.money; we apply (mult-1) as uplift.
+    if (losingInBlitz) {
+      const prevRoundTs = S.allSessions.length > 0
+        ? new Set((S.allSessions[S.allSessions.length - 1].games || []).map(g => g.ts))
+        : new Set();
+      const roundGamesFlat = s.games.filter(g => !prevRoundTs.has(g.ts));
+      S.players.forEach(p => {
+        const flatRound = roundGamesFlat.reduce((sum, g) => sum + (g.delta?.[p] || 0), 0);
+        const uplift = flatRound * (sessionBlitzMult - 1);
+        if (Math.abs(uplift) > 0.001) {
+          s.money[p] = (s.money[p] || 0) + uplift;
+          game.delta[p] = (game.delta[p] || 0) + uplift;
+        }
+      });
+    }
+
     winTeamPlayers.forEach(p => { s.money[p] = (s.money[p]||0) + winPay; game.delta[p] = (game.delta[p]||0) + winPay; });
     loseTeamPlayers.forEach(p => { s.money[p] = (s.money[p]||0) - winPay; game.delta[p] = (game.delta[p]||0) - winPay; });
-    // If the game-ending hand was a set AND the round ends in blitz, top-up the set
-    // by the blitz premium so the total = (win + set) * blitzMult.
-    // The set was already paid flat (cfg.set); we add the extra (blitzMult-1)*cfg.set here.
-    if (!fKam && !res.madeIt && losingInBlitz) {
-      const setBlitzExtra = cfg.set * (sessionBlitzMult - 1);
-      winTeamPlayers.forEach(p => { s.money[p] += setBlitzExtra; game.delta[p] += setBlitzExtra; });
-      loseTeamPlayers.forEach(p => { s.money[p] -= setBlitzExtra; game.delta[p] -= setBlitzExtra; });
-    }
 
     S.allSessions.push({ games:[...s.games], money:{...s.money}, winTeam, endedAt:Date.now() });
 
