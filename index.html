@@ -868,11 +868,20 @@ body {
 .field input:focus { border-color: var(--gold); }
 .cfg-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .cfg-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.player-drag-list { display: flex; flex-direction: column; gap: 8px; }
 .player-list-item {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 0; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 10px 12px;
+  background: var(--felt-lighter); border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: transform 0.18s cubic-bezier(0.25,0.8,0.25,1), box-shadow 0.18s ease, border-color 0.18s ease;
+  will-change: transform; position: relative; user-select: none;
 }
-.player-list-item:last-child { border-bottom: none; }
+.player-list-item.dragging {
+  box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+  border-color: var(--gold); z-index: 10;
+  transition: box-shadow 0.15s, border-color 0.15s; /* no transform transition — follows finger */
+}
 .player-list-name { font-size: 14px; font-weight: 500; }
 .btn-rm {
   background: none;
@@ -902,8 +911,6 @@ body {
   line-height: 1;
 }
 .drag-handle:active { cursor: grabbing; }
-.player-list-item.dragging { opacity: 0.4; }
-.player-list-item.drag-over { box-shadow: 0 -2px 0 var(--gold); }
 /* Bench players */
 .bench-section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
 .bench-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--cream-dim); font-family: 'DM Mono', monospace; margin-bottom: 8px; }
@@ -3061,7 +3068,7 @@ function renderSetup() {
   const list = document.getElementById('player-list-setup');
   const teamLabels = ['Team A','Team A','Team B','Team B'];
   const teamColors = ['var(--gold-dim)','var(--gold-dim)','var(--teal-dim)','var(--teal-dim)'];
-  list.innerHTML = S.players.map((p, i) => {
+  list.innerHTML = `<div class="player-drag-list">${S.players.map((p, i) => {
     const label = i < 4
       ? `<span style="font-size:9px;font-family:'DM Mono',monospace;letter-spacing:0.08em;color:${teamColors[i]};text-transform:uppercase;min-width:44px">${teamLabels[i]}</span>`
       : `<span style="font-size:9px;font-family:'DM Mono',monospace;color:var(--cream-dim);min-width:44px">Sub</span>`;
@@ -3072,7 +3079,7 @@ function renderSetup() {
       </div>
       <button class="btn-rm" onclick="removePlayer(${i})">Remove</button>
     </div>`;
-  }).join('');
+  }).join('')}</div>`;
 
   // Bench section
   const bench = getBenchPlayers();
@@ -3088,80 +3095,89 @@ function renderSetup() {
   initPlayerDrag();
 }
 
-let _pdFrom = null;
-
 function initPlayerDrag() {
-  const items = document.querySelectorAll('.player-list-item[data-pidx]');
+  const items = Array.from(document.querySelectorAll('.player-list-item[data-pidx]'));
+  if (!items.length) return;
+
+  // Measure gap between items (height + gap)
+  const ITEM_H = items.length > 1
+    ? items[1].getBoundingClientRect().top - items[0].getBoundingClientRect().top
+    : items[0].offsetHeight + 8;
+
+  let pdFrom = null, pdHover = null;
+
+  function applyShifts(fromIdx, hoverIdx) {
+    items.forEach((item, idx) => {
+      if (idx === fromIdx) return;
+      if (fromIdx < hoverIdx)
+        item.style.transform = (idx > fromIdx && idx <= hoverIdx) ? `translateY(-${ITEM_H}px)` : '';
+      else if (fromIdx > hoverIdx)
+        item.style.transform = (idx >= hoverIdx && idx < fromIdx) ? `translateY(${ITEM_H}px)` : '';
+      else
+        item.style.transform = '';
+    });
+  }
+
+  function clearAll() {
+    items.forEach(i => { i.style.transform = ''; i.classList.remove('dragging'); });
+    pdFrom = null; pdHover = null;
+  }
+
   items.forEach(el => {
-    // Desktop HTML5 drag
+    const fromIdx = parseInt(el.dataset.pidx);
+
+    // ── Desktop HTML5 drag ──────────────────────────
     el.setAttribute('draggable', 'true');
     el.addEventListener('dragstart', e => {
-      _pdFrom = parseInt(el.dataset.pidx);
+      pdFrom = fromIdx; pdHover = fromIdx;
       e.dataTransfer.effectAllowed = 'move';
       setTimeout(() => el.classList.add('dragging'), 0);
     });
-    el.addEventListener('dragend', () => {
-      el.classList.remove('dragging');
-      items.forEach(i => i.classList.remove('drag-over'));
-    });
+    el.addEventListener('dragend', () => { clearAll(); });
     el.addEventListener('dragover', e => {
       e.preventDefault();
-      items.forEach(i => i.classList.remove('drag-over'));
-      el.classList.add('drag-over');
+      if (pdFrom === null) return;
+      pdHover = fromIdx;
+      applyShifts(pdFrom, pdHover);
     });
     el.addEventListener('drop', e => {
       e.preventDefault();
-      const to = parseInt(el.dataset.pidx);
-      if (_pdFrom !== null && _pdFrom !== to) movePlayerTo(_pdFrom, to);
-      _pdFrom = null;
-      items.forEach(i => i.classList.remove('drag-over'));
+      const from = pdFrom, to = pdHover;
+      clearAll();
+      if (from !== null && to !== null && from !== to) movePlayerTo(from, to);
     });
 
-    // Mobile touch drag on handle
+    // ── Mobile touch on handle ───────────────────────
     const handle = el.querySelector('.drag-handle');
     if (!handle) return;
-    let touchStartY = 0;
+    let startY = 0;
 
     handle.addEventListener('touchstart', e => {
-      _pdFrom = parseInt(el.dataset.pidx);
-      touchStartY = e.touches[0].clientY;
+      pdFrom = fromIdx; pdHover = fromIdx;
+      startY = e.touches[0].clientY;
       el.classList.add('dragging');
     }, { passive: true });
 
     handle.addEventListener('touchmove', e => {
-      if (_pdFrom === null) return;
+      if (pdFrom === null) return;
       e.preventDefault();
-      const dy = e.touches[0].clientY - touchStartY;
+      const dy = e.touches[0].clientY - startY;
+      // Dragged box follows finger exactly (no transition)
       el.style.transform = `translateY(${dy}px)`;
-      el.style.zIndex = '50';
-      el.style.position = 'relative';
-      // Find item under finger
-      el.style.pointerEvents = 'none';
-      const under = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
-      el.style.pointerEvents = '';
-      const target = under?.closest('.player-list-item[data-pidx]');
-      items.forEach(i => i.classList.remove('drag-over'));
-      if (target && target !== el) target.classList.add('drag-over');
+      // Compute which slot we're hovering over
+      const newHover = Math.max(0, Math.min(items.length - 1, fromIdx + Math.round(dy / ITEM_H)));
+      if (newHover !== pdHover) {
+        pdHover = newHover;
+        applyShifts(fromIdx, pdHover);
+        el.style.transform = `translateY(${dy}px)`; // keep dragged on top after applyShifts
+      }
     }, { passive: false });
 
-    handle.addEventListener('touchend', e => {
-      if (_pdFrom === null) return;
-      el.style.transform = '';
-      el.style.zIndex = '';
-      el.style.position = '';
-      el.classList.remove('dragging');
-      items.forEach(i => i.classList.remove('drag-over'));
-      const touch = e.changedTouches[0];
-      el.style.pointerEvents = 'none';
-      const under = document.elementFromPoint(touch.clientX, touch.clientY);
-      el.style.pointerEvents = '';
-      const target = under?.closest('.player-list-item[data-pidx]');
-      const from = _pdFrom;
-      _pdFrom = null;
-      if (target) {
-        const to = parseInt(target.dataset.pidx);
-        if (from !== to) movePlayerTo(from, to);
-      }
+    handle.addEventListener('touchend', () => {
+      if (pdFrom === null) return;
+      const from = pdFrom, to = pdHover;
+      clearAll();
+      if (from !== to) movePlayerTo(from, to);
     });
   });
 }
