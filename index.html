@@ -1934,7 +1934,7 @@ try {
 
 // ── State ────────────────────────────────────────────
 let S = {
-  players: ['Matt','Jackson','Juan','Rohin'],
+  players: ['Matt','Juan','Rohin','Jackson'],
   cfg: { pts:9, target:20, win:5, boston:3, cam:1, set:2, blitz:1.5, kw:2, kl:2 },
   session: null,
   allSessions: [],
@@ -3064,12 +3064,18 @@ function getBenchPlayers() {
 }
 
 function renderSetup() {
-  _startRotIdx = detectStartRot(S.players);
   renderSetupRotPicker();
   const list = document.getElementById('player-list-setup');
   const teamLabels = ['Team A','Team A','Team B','Team B'];
   const teamColors = ['var(--gold-dim)','var(--gold-dim)','var(--teal-dim)','var(--teal-dim)'];
-  list.innerHTML = `<div class="player-drag-list">${S.players.map((p, i) => {
+  // Display the 4 active players in the current rotation's team order
+  // so dragging them visually changes teams → auto-updates starting rotation.
+  // S.players stays in canonical order; remove button uses canonical index.
+  const displayPlayers = S.players.length >= 4
+    ? getRots(S.players)[_startRotIdx]   // [teamA0, teamA1, teamB0, teamB1]
+    : S.players.slice(0, 4);
+  list.innerHTML = `<div class="player-drag-list">${displayPlayers.map((p, i) => {
+    const canonIdx = S.players.indexOf(p);
     const label = i < 4
       ? `<span style="font-size:9px;font-family:'DM Mono',monospace;letter-spacing:0.08em;color:${teamColors[i]};text-transform:uppercase;min-width:44px">${teamLabels[i]}</span>`
       : `<span style="font-size:9px;font-family:'DM Mono',monospace;color:var(--cream-dim);min-width:44px">Sub</span>`;
@@ -3078,7 +3084,7 @@ function renderSetup() {
       <div style="display:flex;align-items:center;flex:1;min-width:0;gap:6px">
         ${label}<span class="player-list-name">${p}</span>
       </div>
-      <button class="btn-rm" onclick="removePlayer(${i})">Remove</button>
+      <button class="btn-rm" onclick="removePlayer(${canonIdx})">Remove</button>
     </div>`;
   }).join('')}</div>`;
 
@@ -3183,22 +3189,21 @@ function initPlayerDrag() {
   });
 }
 
-function detectStartRot(players) {
-  if (players.length < 4) return 0;
-  const rots = getRots(players);
-  const teamA = new Set([players[0], players[1]]);
+function movePlayerTo(from, to) {
+  if (S.players.length < 4) return;
+  // Work entirely in visual space — S.players (canonical) is never changed by drag.
+  // Get current visual order, apply the drag, then find which canonical rotation
+  // has the resulting Team A (positions 0-1).
+  const rots = getRots(S.players);
+  const visual = [...rots[_startRotIdx]];
+  const [moved] = visual.splice(from, 1);
+  visual.splice(to, 0, moved);
+  const newTeamA = new Set([visual[0], visual[1]]);
   for (let i = 0; i < rots.length; i++) {
     const rotA = new Set([rots[i][0], rots[i][1]]);
-    if ([...teamA].every(p => rotA.has(p))) return i;
+    if ([...newTeamA].every(p => rotA.has(p))) { _startRotIdx = i; break; }
   }
-  return 0;
-}
-
-function movePlayerTo(from, to) {
-  const p = S.players.splice(from, 1)[0];
-  S.players.splice(to, 0, p);
-  _startRotIdx = detectStartRot(S.players);
-  save(); renderSetup();
+  renderSetup(); // no save needed — S.players unchanged
 }
 
 function movePlayer(i, dir) {
