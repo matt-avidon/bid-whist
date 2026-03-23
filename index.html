@@ -1942,8 +1942,13 @@ let S = {
   allTimeMoney: {},
   settleOffset: {},      // snapshot of combinedMoney at last "Mission Ceviche" settlement
   prevSettleOffset: null, // previous settleOffset, kept for one-level undo
-  settleCount: 0         // total number of Mission Ceviche settle-ups
+  settleCount: 0,        // total number of Mission Ceviche settle-ups
+  settleVersion: 0,      // monotonic counter — used to pick the most recent settle state on Firebase merge
+  startRotIdx: 0         // persisted starting rotation index for setup page
 };
+
+let _lastTs = 0;
+function uniqueTs() { const t = Date.now(); _lastTs = (t <= _lastTs) ? _lastTs + 1 : t; return _lastTs; }
 
 function load() {
   try {
@@ -2378,8 +2383,8 @@ function updatePreview() {
     }
   } else if (!fKam) {
     if (res.madeIt) {
-      const bosPay = res.isBos ? (cfg.boston * blitzMult) : 0;
-      const camPay = res.isCam ? (cfg.cam * blitzMult) : 0;
+      const bosPay = res.isBos ? cfg.boston : 0;
+      const camPay = res.isCam ? cfg.cam : 0;
       const bonus = bosPay + camPay;
       if (bonus > 0) {
         lines.push(`<span class="made">${bidTeamNames} made it${bidBlitz?' (blitz)':''} — +$${bonus.toFixed(2)} bonus</span>`);
@@ -2441,8 +2446,8 @@ function logGame() {
     if (res.madeIt) {
       // Win bonus ($5) only paid at session end (9 pts) — not per hand
       let bonus = 0;
-      if (res.isBos) bonus += cfg.boston * blitzMult;
-      if (res.isCam) bonus += cfg.cam * blitzMult;
+      if (res.isBos) bonus += cfg.boston;
+      if (res.isCam) bonus += cfg.cam;
       if (bonus > 0) {
         bidTeam.forEach(p => delta[p] += bonus);
         otherTeam.forEach(p => delta[p] -= bonus);
@@ -2467,7 +2472,7 @@ function logGame() {
     if (fKamOutcome==='made') { bidTeam.forEach(p=>{ps[p].wins++;ps[p].kamM++;}); otherTeam.forEach(p=>ps[p].losses++); }
     else { bidTeam.forEach(p=>{ps[p].losses++;ps[p].sets++;}); otherTeam.forEach(p=>ps[p].wins++); }
   }
-  if (ps[fBidder]) { ps[fBidder].bids++; if(res.madeIt && !fKam) ps[fBidder].bidsMade++; }
+  if (ps[fBidder] && !fKam) { ps[fBidder].bids++; if(res.madeIt) ps[fBidder].bidsMade++; }
 
   // Record game (snapshot pre-undo state too)
   const game = {
@@ -2482,7 +2487,7 @@ function logGame() {
     delta, scoreA:s.scoreA, scoreB:s.scoreB,
     // store previous scores for undo
     prevScoreA, prevScoreB,
-    ts: Date.now(),
+    ts: uniqueTs(),
     rotationIncremented: false  // set to true below if rotation fires
   };
   s.games.push(game);
@@ -2619,7 +2624,7 @@ function undoLastGame() {
     if (g.kamOutcome==='made') { bidTeam.forEach(p=>{if(ps[p]){ps[p].wins--;ps[p].kamM--;}}); otherTeam.forEach(p=>{if(ps[p])ps[p].losses--;}); }
     else { bidTeam.forEach(p=>{if(ps[p]){ps[p].losses--;ps[p].sets--;}}); otherTeam.forEach(p=>{if(ps[p])ps[p].wins--;}); }
   }
-  if (ps[g.bidder]) { ps[g.bidder].bids--; if(g.madeIt && !g.kamikaze) ps[g.bidder].bidsMade--; }
+  if (ps[g.bidder] && !g.kamikaze) { ps[g.bidder].bids--; if(g.madeIt) ps[g.bidder].bidsMade--; }
 
   // If we just un-did a session-ending game that triggered an allSessions push,
   // remove that session record too
@@ -2936,9 +2941,9 @@ function renderStats() {
           defTeam.forEach(p => { if(ps[p]) ps[p].wins++; });
         }
       }
-      if (g.bidder && ps[g.bidder]) {
+      if (g.bidder && ps[g.bidder] && !g.kamikaze) {
         ps[g.bidder].bids++;
-        if (g.madeIt && !g.kamikaze) ps[g.bidder].bidsMade++;
+        if (g.madeIt) ps[g.bidder].bidsMade++;
       }
     });
     return ps;
@@ -3064,6 +3069,7 @@ function getBenchPlayers() {
 }
 
 function renderSetup() {
+  _startRotIdx = S.startRotIdx || 0;
   renderSetupRotPicker();
   const list = document.getElementById('player-list-setup');
   const teamLabels = ['Team A','Team A','Team B','Team B'];
@@ -3203,7 +3209,9 @@ function movePlayerTo(from, to) {
     const rotA = new Set([rots[i][0], rots[i][1]]);
     if ([...newTeamA].every(p => rotA.has(p))) { _startRotIdx = i; break; }
   }
-  renderSetup(); // no save needed — S.players unchanged
+  S.startRotIdx = _startRotIdx;
+  save();
+  renderSetup();
 }
 
 function movePlayer(i, dir) {
@@ -3389,6 +3397,7 @@ function missionCeviche() {
     S.settleOffset[p] = (S.allTimeMoney[p]||0) + (S.session?.money[p]||0);
   });
   S.settleCount = (S.settleCount || 0) + 1;
+  S.settleVersion = (S.settleVersion || 0) + 1;
   save(); renderLedger();
 }
 function undoMissionCeviche() {
@@ -5120,14 +5129,22 @@ function applyRemoteData(data) {
   // 300 ms debounce window after a settle-up, which would wipe prevSettleOffset.
   // Local settle state is always saved to localStorage immediately, so it is the
   // source of truth until Firebase catches up.
-  const localSettle    = S.settleOffset    || {};
+  const localSettle     = S.settleOffset    || {};
   const localPrevSettle = S.prevSettleOffset;
+  const localSettleVer  = S.settleVersion   || 0;
   S = data;
-  // Keep whichever settle state has more entries (i.e. the more recent one).
-  if (Object.keys(localSettle).length >= Object.keys(S.settleOffset).length) {
-    S.settleOffset = localSettle;
+  // Keep whichever settle state is more recent (higher settleVersion).
+  // Falls back to key-count comparison for old data without a version.
+  const remoteVer = S.settleVersion || 0;
+  const useLocal = localSettleVer > remoteVer ||
+    (localSettleVer === remoteVer && Object.keys(localSettle).length >= Object.keys(S.settleOffset || {}).length);
+  if (useLocal) {
+    S.settleOffset    = localSettle;
     S.prevSettleOffset = localPrevSettle !== undefined ? localPrevSettle : null;
+    S.settleVersion   = localSettleVer;
+    S.settleCount     = Math.max(S.settleCount || 0, localSettleVer);
   }
+  _startRotIdx = S.startRotIdx || 0;
   localStorage.setItem('whist4', JSON.stringify(S));
   const active = document.querySelector('.view.active');
   if (!active) return;
