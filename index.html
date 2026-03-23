@@ -1849,6 +1849,11 @@ body { -webkit-text-size-adjust: 100%; }
         <div class="field"><label>Kam loss ×</label><input type="number" id="cfg-kl" value="2" step="0.5"></div>
       </div>
     </div>
+    <div class="card">
+      <div class="card-title">Starting rotation</div>
+      <div style="font-size:11px;color:var(--cream-dim);margin-bottom:10px">Which teams play first this session?</div>
+      <div id="setup-rot-picker"></div>
+    </div>
     <button class="btn-start" onclick="startSession()">▶ Start session</button>
     <div style="display:flex;gap:8px;margin-top:8px">
       <button class="btn-danger" style="margin-top:0" onclick="exportData()">⬇ Export JSON</button>
@@ -1997,10 +2002,12 @@ function dismissWinPopup() {
 // ── Rotations ──────────────────────────────────────
 function getRots(ps) {
   const p = ps.slice(0,4);
+  // Fixed order: p[0] (Matt) stays; partners cycle Jackson → Juan → Rohin
+  // p[0]=Matt, p[1]=Juan, p[2]=Rohin, p[3]=Jackson
   return [
-    [p[0],p[1],p[2],p[3]],
-    [p[0],p[2],p[1],p[3]],
-    [p[0],p[3],p[1],p[2]]
+    [p[0],p[3],p[1],p[2]],  // Matt/Jackson vs Juan/Rohin
+    [p[0],p[1],p[3],p[2]],  // Matt/Juan vs Jackson/Rohin
+    [p[0],p[2],p[1],p[3]]   // Matt/Rohin vs Juan/Jackson
   ];
 }
 function curRot() {
@@ -3050,6 +3057,7 @@ function getBenchPlayers() {
 }
 
 function renderSetup() {
+  renderSetupRotPicker();
   const list = document.getElementById('player-list-setup');
   const teamLabels = ['Team A','Team A','Team B','Team B'];
   const teamColors = ['var(--gold-dim)','var(--gold-dim)','var(--teal-dim)','var(--teal-dim)'];
@@ -3232,6 +3240,37 @@ function mergeIntoAllTime() {
   });
 }
 
+let _startRotIdx = 0;
+
+function setStartRot(i) {
+  _startRotIdx = i;
+  renderSetupRotPicker();
+}
+
+function renderSetupRotPicker() {
+  const el = document.getElementById('setup-rot-picker');
+  if (!el) return;
+  if (S.players.length < 4) { el.innerHTML = ''; return; }
+  const rots = getRots(S.players);
+  let html = '';
+  rots.forEach((r, i) => {
+    const active = i === _startRotIdx;
+    html += `<button onclick="setStartRot(${i})" style="
+      display:flex;flex-direction:column;align-items:center;gap:3px;
+      flex:1;padding:8px 6px;border-radius:8px;border:1px solid ${active ? 'var(--gold)' : 'var(--border)'};
+      background:${active ? 'rgba(201,168,76,0.12)' : 'var(--felt-lighter)'};
+      color:${active ? 'var(--gold-pale)' : 'var(--cream-dim)'};
+      font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;
+      -webkit-tap-highlight-color:transparent;transition:all 0.15s">
+      <span style="font-size:9px;color:${active ? 'var(--gold-dim)' : 'var(--cream-faint)'};text-transform:uppercase;letter-spacing:0.08em">Rot ${i+1}</span>
+      <span style="font-size:11px;font-weight:600;color:${active ? 'var(--gold-pale)' : 'var(--cream)'};">${r[0]} &amp; ${r[1]}</span>
+      <span style="font-size:9px;color:var(--cream-dim)">vs</span>
+      <span style="font-size:11px;color:${active ? 'var(--gold-pale)' : 'var(--cream)'};">${r[2]} &amp; ${r[3]}</span>
+    </button>`;
+  });
+  el.innerHTML = `<div style="display:flex;gap:8px">${html}</div>`;
+}
+
 function startSession() {
   if (S.players.length < 4) return alert('Need at least 4 players.');
   if (S.session && S.session.games && S.session.games.length > 0) {
@@ -3261,7 +3300,7 @@ function startSession() {
   if (invalids.length) return alert('Invalid config:\n• ' + invalids.join('\n• '));
   const cfg = raw;
   S.cfg = cfg;
-  S.session = { games:[], rotationIdx:0, scoreA:0, scoreB:0, money:{}, pStats:{}, cfg, startedAt:Date.now(), rotationBaseline:{} };
+  S.session = { games:[], rotationIdx:_startRotIdx, scoreA:0, scoreB:0, money:{}, pStats:{}, cfg, startedAt:Date.now(), rotationBaseline:{} };
   S.players.forEach(p => { S.session.money[p]=0; S.session.pStats[p]={wins:0,losses:0,sets:0,bostons:0,cams:0,bids:0,bidsMade:0,kamA:0,kamM:0}; });
   resetForm();
   dismissWinPopup();
