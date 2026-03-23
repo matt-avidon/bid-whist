@@ -3793,7 +3793,7 @@ function renderInsightsAdvanced(player, games, allGames) {
 
   // ── Section: Performance Score ──────────────────
   html += `<div class="insights-section"><div class="insights-section-title">Performance Score</div>`;
-  html += `<div class="ins-metric-grid">`;
+  html += `<div class="ins-metric-grid" style="grid-template-columns:3fr 2fr">`;
 
   const bpsDisp = bps !== null ? bps.toFixed(2) : (m.G < 20 || m.bidGames.length < 10) ? `Need more games` : '—';
   const bpsCls  = bps !== null ? (bps >= 1.5 ? 'gold' : bps >= 1.0 ? 'pos' : 'neg') : 'dim';
@@ -3804,7 +3804,7 @@ function renderInsightsAdvanced(player, games, allGames) {
   const warpDisp = warp !== null ? `${warp >= 0 ? '+' : ''}${warp.toFixed(1)}` : games.length < 30 ? `Need ${30 - games.length} more games` : '—';
   const warpCls  = warp !== null ? (warp >= 5 ? 'pos' : warp <= -5 ? 'neg' : '') : 'dim';
   const warpBadge = warp !== null && warp >= 10 ? '<div class="ins-mc-badge">🔥 Elite partner</div>' : warp !== null && warp <= -10 ? '<div class="ins-mc-badge neg">Below avg</div>' : '';
-  html += `<div class="ins-metric-cell wide" data-def="warp"><div class="ins-mc-label">WARP</div><div class="ins-mc-val ${warpCls}">${warpDisp}</div><div class="ins-mc-sub">per 100g</div>${warpBadge}</div>`;
+  html += `<div class="ins-metric-cell" data-def="warp"><div class="ins-mc-label">WARP</div><div class="ins-mc-val ${warpCls}">${warpDisp}</div><div class="ins-mc-sub">per 100g</div>${warpBadge}</div>`;
 
   const ceilDisp = m.bidCeiling !== null ? `Bid ${m.bidCeiling}` : m.G >= 20 ? 'Not found yet' : '—';
   const ceilCls  = m.bidCeiling !== null ? (m.bidCeiling >= 5 ? 'pos' : m.bidCeiling <= 3 ? 'neg' : '') : 'dim';
